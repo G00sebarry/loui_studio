@@ -1,98 +1,85 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowDownRight } from 'lucide-react';
+import { ArrowDownRight, Play } from 'lucide-react';
 
 const Hero: React.FC = () => {
   return (
-    <section className="relative min-h-screen flex flex-col md:flex-row pt-20 overflow-hidden">
-      {/* Left Content */}
-      <div className="w-full md:w-1/2 flex flex-col justify-center px-6 md:px-12 lg:px-20 z-10">
+    <section className="relative min-h-screen pt-24 md:pt-28 overflow-hidden border-b border-black/10 bg-white">
+      <img
+        src="/hero/ded-loui-bg.png"
+        alt="Дед Луи в студии"
+        className="absolute inset-0 h-full w-full object-cover object-right md:object-center"
+      />
+
+      <div className="absolute inset-0 bg-white/75 md:bg-gradient-to-r md:from-white/90 md:via-white/72 md:to-transparent" />
+
+      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-6rem)] max-w-7xl grid-cols-1 items-center gap-10 px-6 pb-20 md:grid-cols-2 md:px-10 lg:px-16">
         <motion.div
-          initial={{ opacity: 0, x: -50 }}
+          initial={{ opacity: 0, x: -30 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          transition={{ duration: 0.7, ease: 'easeOut' }}
+          className="max-w-xl"
         >
-          <h1 className="text-[12vw] md:text-[8vw] leading-[0.85] font-display font-bold text-loui-black mb-6">
-            LOUI <br /> 
+          <h1 className="text-[17vw] leading-[0.84] font-display font-bold text-loui-black md:text-[7.5vw] lg:text-[6rem]">
+            LOUI <br />
             <span className="text-loui-blue">STUDIO</span>
           </h1>
-          
-          <h2 className="text-xl md:text-2xl font-light mb-8 max-w-md">
+
+          <p className="mt-5 text-xl font-light text-loui-black/80 md:text-3xl">
             Студия машинной вышивки для HoReCa и брендов, которым не всё равно.
-          </h2>
+          </p>
 
-          <motion.a 
-            href="#calculator"
-            className="inline-flex items-center gap-4 bg-loui-blue text-white px-8 py-6 text-lg md:text-xl font-bold uppercase tracking-wider group hover:bg-loui-orange transition-colors duration-300"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <span>Рассчитать за 20 сек</span>
-            <ArrowDownRight className="group-hover:rotate-45 transition-transform duration-300" />
-          </motion.a>
+          <div className="mt-8 flex flex-wrap items-center gap-4">
+            <motion.a
+              href="#calculator"
+              className="inline-flex items-center gap-3 bg-loui-blue text-white px-7 py-4 text-base md:text-lg font-bold uppercase tracking-wide group hover:bg-loui-orange transition-colors duration-300"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <span>Рассчитать за 20 сек</span>
+              <ArrowDownRight className="group-hover:rotate-45 transition-transform duration-300" />
+            </motion.a>
+            <span className="text-sm uppercase tracking-[0.18em] text-loui-black/60">Дед Луи одобряет</span>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+          className="mx-auto w-full max-w-[320px] md:mr-0 md:ml-auto"
+        >
+          <div className="relative rounded-[2.4rem] border-[10px] border-black bg-black p-2 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+            <div className="absolute left-1/2 top-1 h-5 w-28 -translate-x-1/2 rounded-full bg-black" />
+
+            <div className="relative aspect-[9/19.5] overflow-hidden rounded-[1.9rem] bg-[#0f0f12]">
+              <video
+                className="h-full w-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+                poster="/hero/ded-loui-bg.png"
+              >
+                <source src="/reels/hero-reel.mp4" type="video/mp4" />
+              </video>
+
+              <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/55 via-transparent to-transparent p-5 text-center">
+                <p className="text-xs uppercase tracking-[0.18em] text-white/90">
+                  Добавьте файл <strong>/public/reels/hero-reel.mp4</strong>
+                </p>
+              </div>
+
+              <div className="absolute right-4 top-4 rounded-full bg-white/90 p-2 text-loui-black">
+                <Play size={14} className="fill-loui-black" />
+              </div>
+            </div>
+          </div>
         </motion.div>
       </div>
 
-      {/* Right Content - Abstract Visual */}
-      <div className="w-full md:w-1/2 h-[50vh] md:h-auto relative flex items-center justify-center">
-        {/* Abstract "Apron/Thread" Simulation */}
-        <motion.div 
-          className="relative w-64 h-64 md:w-96 md:h-96"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1, delay: 0.2 }}
-        >
-           {/* Background shape */}
-           <motion.div 
-            className="absolute inset-0 bg-loui-black rounded-3xl"
-            animate={{ 
-              rotate: [0, 5, -5, 0],
-              y: [0, -20, 0]
-            }}
-            transition={{ 
-              duration: 6, 
-              repeat: Infinity, 
-              ease: "easeInOut" 
-            }}
-           />
-           
-           {/* "Thread" lines */}
-           <svg className="absolute -inset-20 w-[150%] h-[150%] pointer-events-none z-20">
-             <motion.path 
-               d="M50,150 C100,50 300,50 350,250 S100,350 50,150"
-               fill="none"
-               stroke="#0047FF"
-               strokeWidth="4"
-               initial={{ pathLength: 0 }}
-               animate={{ pathLength: 1 }}
-               transition={{ duration: 2, ease: "easeInOut" }}
-             />
-             <motion.path 
-               d="M100,300 C200,400 350,100 400,200"
-               fill="none"
-               stroke="#FF5C00"
-               strokeWidth="4"
-               initial={{ pathLength: 0 }}
-               animate={{ pathLength: 1 }}
-               transition={{ duration: 2, delay: 0.5, ease: "easeInOut" }}
-             />
-           </svg>
-
-           {/* Floating elements */}
-           <motion.div 
-             className="absolute -top-10 -right-10 bg-loui-blue w-20 h-20 rounded-full blur-xl opacity-50"
-             animate={{ scale: [1, 1.2, 1] }}
-             transition={{ duration: 3, repeat: Infinity }}
-           />
-        </motion.div>
-      </div>
-
-      {/* Decorative text marquee element at bottom */}
-      <div className="absolute bottom-0 left-0 w-full overflow-hidden whitespace-nowrap py-2 bg-loui-black text-white text-xs md:text-sm uppercase tracking-[0.2em] opacity-80">
-        <motion.div 
-          animate={{ x: [0, -1000] }} 
-          transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
-        >
+      <div className="absolute bottom-0 left-0 w-full overflow-hidden whitespace-nowrap py-2 bg-loui-black text-white text-xs md:text-sm uppercase tracking-[0.2em] opacity-85">
+        <motion.div animate={{ x: [0, -1000] }} transition={{ repeat: Infinity, duration: 20, ease: 'linear' }}>
           High Quality Embroidery — Made in Moscow — Durable Materials — Precision Stitching — High Quality Embroidery — Made in Moscow — Durable Materials — Precision Stitching
         </motion.div>
       </div>

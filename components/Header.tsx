@@ -7,7 +7,7 @@ const Header: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 mix-blend-difference text-white w-full px-6 py-4 flex justify-between items-center">
+    <header className="fixed top-0 left-0 right-0 z-50 w-full border-b border-black/10 bg-white/90 px-6 py-4 text-loui-black backdrop-blur flex justify-between items-center">
       {/* Logo */}
       <a href="#" className="text-3xl font-display font-bold tracking-tighter flex items-center group">
         LOUI
@@ -30,14 +30,14 @@ const Header: React.FC = () => {
             {item.label}
           </a>
         ))}
-        <button className="border border-white px-5 py-2 text-sm uppercase hover:bg-loui-blue hover:border-loui-blue transition-all">
+        <button className="border border-loui-black px-5 py-2 text-sm uppercase hover:bg-loui-blue hover:border-loui-blue hover:text-white transition-all">
           Связаться
         </button>
       </nav>
 
       {/* Mobile Toggle */}
       <button 
-        className="md:hidden z-50 text-white"
+        className="md:hidden z-50 text-loui-black"
         onClick={() => setIsOpen(!isOpen)}
       >
         {isOpen ? <X /> : <Menu />}

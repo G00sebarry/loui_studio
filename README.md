@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Loui Studio
 
-# Run and deploy your AI Studio app
+Сайт студии машинной вышивки Loui Studio на React + Vite.
 
-This contains everything you need to run your app locally.
+## Локальный запуск
 
-View your app in AI Studio: https://ai.studio/apps/drive/1Hk0lWKGP2xIvrHlJ27XP5tm1sGrYrQjm
+1. Установить зависимости:
+   ```bash
+   npm install
+   ```
+2. Запустить dev-сервер:
+   ```bash
+   npm run dev
+   ```
+3. Открыть в браузере `http://localhost:3000`.
 
-## Run Locally
+## Как добавлять медиа (фото/видео)
 
-**Prerequisites:**  Node.js
+### Hero background (маскот)
+- Положите фон в `public/hero/ded-loui-bg.png`.
+- Этот файл используется как фон первого экрана.
 
+### Видео в iPhone-рамке
+- Положите ролик в `public/reels/hero-reel.mp4`.
+- До загрузки ролика блок покажет постер и подсказку, что нужно добавить файл.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Портфолио
+- Изображения хранятся в `public/portfolio/`.
+- В `components/Portfolio.tsx` можно менять порядок/названия карточек и их подписи.
