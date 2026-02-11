@@ -1,4 +1,4 @@
-import { PricingModel, NavItem, DesignType, Placement, DesignComplexity } from './types';
+import { NavItem, DesignType, Placement, DesignComplexity } from './types';
 
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Преимущества', href: '#features' },
@@ -7,77 +7,81 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Контакты', href: '#footer' },
 ];
 
-// ── Legacy pricing (kept for reference) ─────────────────
-export const PRICING: PricingModel = {
-  easy: [
-    { min: 1, max: 1, price: 1000 },
-    { min: 2, max: 2, price: 850 },
-    { min: 3, max: 4, price: 790 },
-    { min: 5, max: 9, price: 600 },
-    { min: 10, max: 20, price: 400 },
-    { min: 21, max: 29, price: 370 },
-    { min: 30, max: 39, price: 330 },
-    { min: 40, max: null, price: 300 },
+// ── Actual pricing tiers (+10% от текущих цен, округлено до 10) ──
+
+export interface CalcTier {
+  min: number;
+  max: number;
+  price: number;
+}
+
+export const CALC_PRICING: Record<DesignComplexity, CalcTier[]> = {
+  simple: [
+    { min: 1, max: 1, price: 1100 },
+    { min: 2, max: 2, price: 940 },
+    { min: 3, max: 3, price: 870 },
+    { min: 4, max: 4, price: 770 },
+    { min: 5, max: 5, price: 720 },
+    { min: 6, max: 6, price: 640 },
+    { min: 7, max: 7, price: 610 },
+    { min: 8, max: 8, price: 550 },
+    { min: 9, max: 9, price: 500 },
+    { min: 10, max: 20, price: 440 },
+    { min: 21, max: 29, price: 410 },
+    { min: 30, max: 39, price: 360 },
+    { min: 40, max: 50, price: 330 },
   ],
   medium: [
-    { min: 1, max: 1, price: 1500 },
-    { min: 2, max: 4, price: 1200 },
-    { min: 5, max: 9, price: 900 },
-    { min: 10, max: 20, price: 600 },
-    { min: 21, max: 39, price: 500 },
-    { min: 40, max: null, price: 450 },
+    { min: 1, max: 1, price: 1650 },
+    { min: 2, max: 2, price: 1320 },
+    { min: 3, max: 3, price: 1100 },
+    { min: 4, max: 4, price: 880 },
+    { min: 5, max: 5, price: 830 },
+    { min: 6, max: 6, price: 770 },
+    { min: 7, max: 7, price: 720 },
+    { min: 8, max: 8, price: 660 },
+    { min: 9, max: 9, price: 610 },
+    { min: 10, max: 20, price: 530 },
+    { min: 21, max: 29, price: 510 },
+    { min: 30, max: 39, price: 480 },
+    { min: 40, max: 50, price: 440 },
   ],
-  hard: [
-    { min: 1, max: 1, price: 2500 },
-    { min: 2, max: 4, price: 2000 },
-    { min: 5, max: 9, price: 1500 },
-    { min: 10, max: 20, price: 1000 },
-    { min: 21, max: 39, price: 850 },
-    { min: 40, max: null, price: 750 },
+  complex: [
+    { min: 1, max: 1, price: 2200 },
+    { min: 2, max: 2, price: 1760 },
+    { min: 3, max: 3, price: 1430 },
+    { min: 4, max: 4, price: 1100 },
+    { min: 5, max: 5, price: 990 },
+    { min: 6, max: 6, price: 940 },
+    { min: 7, max: 7, price: 880 },
+    { min: 8, max: 8, price: 830 },
+    { min: 9, max: 9, price: 770 },
+    { min: 10, max: 10, price: 720 },
   ],
 };
 
-export const complexityLabels = {
-  easy: {
-    title: 'Изи',
-    desc: 'Текст, линии, лого без заливки (5-15 см)',
-  },
-  medium: {
-    title: 'Норм',
-    desc: 'Лого с заливкой, надписи >15 см',
-  },
-  hard: {
-    title: 'Хард',
-    desc: 'Большая вышивка на спину, детализация, шевроны',
-  },
-};
-
-// ── New calculator data ─────────────────────────────────
+// ── Calculator UI data ──────────────────────────────────
 
 /** Шаг 1 — Что хотите вышить? */
 export const DESIGN_TYPES: {
   id: DesignType;
   label: string;
   desc: string;
-  sizeFactor: number;
 }[] = [
   {
     id: 'logo',
     label: 'Логотип / Надпись',
     desc: 'Лого, надпись, эмблема — до 10 см',
-    sizeFactor: 1.0,
   },
   {
     id: 'large',
     label: 'Крупный дизайн',
     desc: 'Спина, большой рисунок — до 27 см',
-    sizeFactor: 2.0,
   },
   {
     id: 'small',
     label: 'Мелкие детали',
     desc: 'Имя, небольшая иконка, инициалы',
-    sizeFactor: 0.5,
   },
 ];
 
@@ -85,17 +89,16 @@ export const DESIGN_TYPES: {
 export const PLACEMENTS: {
   id: Placement;
   label: string;
-  factor: number;
 }[] = [
-  { id: 'chest_left', label: 'Грудь слева', factor: 1.0 },
-  { id: 'chest_center', label: 'Грудь по центру', factor: 1.0 },
-  { id: 'chest_right', label: 'Грудь справа', factor: 1.0 },
-  { id: 'back', label: 'Спина', factor: 1.0 },
-  { id: 'sleeve', label: 'Рукав', factor: 1.05 },
-  { id: 'collar', label: 'Воротник', factor: 1.1 },
-  { id: 'hood', label: 'Капюшон', factor: 1.1 },
-  { id: 'pants', label: 'Штаны / Шорты', factor: 1.05 },
-  { id: 'cut', label: 'Крой (отдельная ткань)', factor: 0.85 },
+  { id: 'chest_left', label: 'Грудь слева' },
+  { id: 'chest_center', label: 'Грудь по центру' },
+  { id: 'chest_right', label: 'Грудь справа' },
+  { id: 'back', label: 'Спина' },
+  { id: 'sleeve', label: 'Рукав' },
+  { id: 'collar', label: 'Воротник' },
+  { id: 'hood', label: 'Капюшон' },
+  { id: 'pants', label: 'Штаны / Шорты' },
+  { id: 'cut', label: 'Крой (отдельная ткань)' },
 ];
 
 /** Шаг 3 — Сложность дизайна */
@@ -103,36 +106,35 @@ export const DESIGN_COMPLEXITY: {
   id: DesignComplexity;
   label: string;
   desc: string;
-  basePrice: number;
+  minPrice: number;   // мин. цена за шт (при макс. кол-ве) — для отображения
+  maxQty: number;     // макс. количество в слайдере
 }[] = [
   {
     id: 'simple',
     label: 'Простой',
-    desc: 'Текст, логотип из 1–2 цветов',
-    basePrice: 500,
+    desc: 'Текст, логотип из 1–2 цветов, без заливки (5–15 см)',
+    minPrice: 330,
+    maxQty: 50,
   },
   {
     id: 'medium',
     label: 'Средний',
-    desc: 'Детализированный логотип, 3–5 цветов',
-    basePrice: 1200,
+    desc: 'Лого с заливкой, надписи >15 см, 3–5 цветов',
+    minPrice: 440,
+    maxQty: 50,
   },
   {
     id: 'complex',
     label: 'Сложный',
-    desc: 'Фотореалистичный рисунок, градиенты',
-    basePrice: 2500,
+    desc: 'Детализированная вышивка, градиенты, много цветов',
+    minPrice: 720,
+    maxQty: 10,
   },
 ];
 
-/** Шаг 4 — Скидки за объём */
-export const QUANTITY_DISCOUNTS: {
-  min: number;
-  max: number | null;
-  discount: number;
-  label: string;
-}[] = [
-  { min: 1, max: 4, discount: 0, label: '' },
-  { min: 5, max: 10, discount: 0.1, label: '-10%' },
-  { min: 11, max: null, discount: 0.2, label: '-20%' },
-];
+/** Lookup price from tier table */
+export function lookupPrice(complexity: DesignComplexity, qty: number): number {
+  const tiers = CALC_PRICING[complexity];
+  const tier = tiers.find((t) => qty >= t.min && qty <= t.max);
+  return tier?.price ?? 0;
+}

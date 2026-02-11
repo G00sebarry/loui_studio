@@ -8,14 +8,13 @@ import {
   Upload,
   MessageCircle,
   Check,
-  ChevronRight,
 } from 'lucide-react';
 import { DesignType, Placement, DesignComplexity } from '../types';
 import {
   DESIGN_TYPES,
   PLACEMENTS,
   DESIGN_COMPLEXITY,
-  QUANTITY_DISCOUNTS,
+  lookupPrice,
 } from '../constants';
 
 /* ─── icon map for design types ─── */
@@ -33,24 +32,70 @@ const fadeUp = {
   transition: { duration: 0.35 },
 };
 
-const getDiscount = (qty: number) => {
-  const tier = QUANTITY_DISCOUNTS.find(
-    (t) => qty >= t.min && (t.max === null || qty <= t.max),
-  );
-  return tier ?? QUANTITY_DISCOUNTS[0];
-};
-
 /* ─── step badge ─── */
 const StepBadge: React.FC<{ n: number; done: boolean }> = ({ n, done }) => (
   <span
     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-      done
-        ? 'bg-loui-blue text-white'
-        : 'bg-loui-black text-white'
+      done ? 'bg-loui-blue text-white' : 'bg-loui-black text-white'
     }`}
   >
     {done ? <Check size={14} /> : n}
   </span>
+);
+
+/* ─── animated needle for empty state ─── */
+const NeedleAnimation: React.FC = () => (
+  <div className="relative w-20 h-20 mx-auto mb-4">
+    {/* Thread path */}
+    <motion.svg
+      viewBox="0 0 80 80"
+      className="w-full h-full"
+      initial="hidden"
+      animate="visible"
+    >
+      <motion.path
+        d="M 10 60 Q 25 20, 40 40 Q 55 60, 70 25"
+        fill="none"
+        stroke="#0047FF"
+        strokeWidth="2"
+        strokeLinecap="round"
+        initial={{ pathLength: 0, opacity: 0.3 }}
+        animate={{ pathLength: 1, opacity: [0.3, 0.7, 0.3] }}
+        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      {/* Needle */}
+      <motion.circle
+        r="3"
+        fill="#0047FF"
+        initial={{ offsetDistance: '0%' }}
+        animate={{ cx: [10, 40, 70, 40, 10], cy: [60, 40, 25, 40, 60] }}
+        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      {/* Stitch dots */}
+      {[
+        { cx: 20, cy: 38, delay: 0.5 },
+        { cx: 35, cy: 42, delay: 1.0 },
+        { cx: 50, cy: 35, delay: 1.5 },
+        { cx: 62, cy: 30, delay: 2.0 },
+      ].map((dot, i) => (
+        <motion.circle
+          key={i}
+          cx={dot.cx}
+          cy={dot.cy}
+          r="1.5"
+          fill="#0047FF"
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: [0, 0.6, 0], scale: [0, 1, 0] }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            delay: dot.delay,
+            ease: 'easeInOut',
+          }}
+        />
+      ))}
+    </motion.svg>
+  </div>
 );
 
 /* ━━━ MAIN COMPONENT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -70,28 +115,36 @@ const Calculator: React.FC = () => {
           ? 3
           : 4;
 
-  const allSelected = designType !== null && placement !== null && complexity !== null;
+  const allSelected =
+    designType !== null && placement !== null && complexity !== null;
 
-  const { pricePerItem, totalPrice, discountTier } = useMemo(() => {
-    if (!allSelected) return { pricePerItem: 0, totalPrice: 0, discountTier: getDiscount(1) };
+  /* max quantity depends on complexity */
+  const maxQty = useMemo(() => {
+    if (!complexity) return 50;
+    return DESIGN_COMPLEXITY.find((c) => c.id === complexity)?.maxQty ?? 50;
+  }, [complexity]);
 
-    const dt = DESIGN_TYPES.find((d) => d.id === designType)!;
-    const pl = PLACEMENTS.find((p) => p.id === placement)!;
-    const cx = DESIGN_COMPLEXITY.find((c) => c.id === complexity)!;
-    const tier = getDiscount(quantity);
+  /* clamp quantity when complexity changes */
+  const effectiveQty = Math.min(quantity, maxQty);
 
-    const raw = Math.round(cx.basePrice * dt.sizeFactor * pl.factor);
-    const perItem = Math.round(raw * (1 - tier.discount));
-    return { pricePerItem: perItem, totalPrice: perItem * quantity, discountTier: tier };
-  }, [designType, placement, complexity, quantity, allSelected]);
+  const { pricePerItem, totalPrice } = useMemo(() => {
+    if (!allSelected)
+      return { pricePerItem: 0, totalPrice: 0 };
+
+    const perItem = lookupPrice(complexity, effectiveQty);
+    return { pricePerItem: perItem, totalPrice: perItem * effectiveQty };
+  }, [complexity, effectiveQty, allSelected]);
 
   /* labels for summary */
   const designLabel = DESIGN_TYPES.find((d) => d.id === designType)?.label;
   const placementLabel = PLACEMENTS.find((p) => p.id === placement)?.label;
-  const complexityLabel = DESIGN_COMPLEXITY.find((c) => c.id === complexity)?.label;
+  const complexityData = DESIGN_COMPLEXITY.find((c) => c.id === complexity);
 
   return (
-    <section id="calculator" className="py-24 px-6 md:px-12 lg:px-20 bg-loui-bg relative">
+    <section
+      id="calculator"
+      className="py-24 px-6 md:px-12 lg:px-20 bg-loui-bg relative"
+    >
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div
@@ -103,7 +156,9 @@ const Calculator: React.FC = () => {
           <h2 className="text-4xl md:text-6xl font-display font-bold mb-4">
             КАЛЬКУЛЯТОР <span className="text-loui-blue">ЦЕНЫ</span>
           </h2>
-          <p className="text-xl text-gray-500">Узнай цену быстрее, чем заварится эспрессо.</p>
+          <p className="text-xl text-gray-500">
+            Узнай цену быстрее, чем заварится эспрессо.
+          </p>
         </motion.div>
 
         <div className="flex flex-col lg:flex-row gap-12">
@@ -121,16 +176,25 @@ const Calculator: React.FC = () => {
                     key={dt.id}
                     onClick={() => setDesignType(dt.id)}
                     className={`relative p-5 border-2 rounded-2xl transition-all duration-200 text-left flex flex-col gap-3 group
-                      ${designType === dt.id
-                        ? 'border-loui-blue bg-white shadow-lg scale-[1.02]'
-                        : 'border-gray-200 hover:border-gray-400 bg-white/60'
+                      ${
+                        designType === dt.id
+                          ? 'border-loui-blue bg-white shadow-lg scale-[1.02]'
+                          : 'border-gray-200 hover:border-gray-400 bg-white/60'
                       }`}
                   >
-                    <span className={`transition-colors ${designType === dt.id ? 'text-loui-blue' : 'text-gray-400 group-hover:text-gray-600'}`}>
+                    <span
+                      className={`transition-colors ${
+                        designType === dt.id
+                          ? 'text-loui-blue'
+                          : 'text-gray-400 group-hover:text-gray-600'
+                      }`}
+                    >
                       {designIcons[dt.id]}
                     </span>
                     <span className="font-bold text-base">{dt.label}</span>
-                    <span className="text-sm text-gray-500 leading-snug">{dt.desc}</span>
+                    <span className="text-sm text-gray-500 leading-snug">
+                      {dt.desc}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -150,9 +214,10 @@ const Calculator: React.FC = () => {
                         key={pl.id}
                         onClick={() => setPlacement(pl.id)}
                         className={`px-5 py-3 rounded-xl border-2 text-sm font-medium transition-all duration-200
-                          ${placement === pl.id
-                            ? 'border-loui-blue bg-white text-loui-blue shadow-md'
-                            : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white/60'
+                          ${
+                            placement === pl.id
+                              ? 'border-loui-blue bg-white text-loui-blue shadow-md'
+                              : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white/60'
                           }`}
                       >
                         {pl.label}
@@ -175,21 +240,37 @@ const Calculator: React.FC = () => {
                     {DESIGN_COMPLEXITY.map((cx) => (
                       <button
                         key={cx.id}
-                        onClick={() => setComplexity(cx.id)}
+                        onClick={() => {
+                          setComplexity(cx.id);
+                          // clamp quantity if switching to complex (max 10)
+                          if (quantity > cx.maxQty) setQuantity(cx.maxQty);
+                        }}
                         className={`p-5 border-2 rounded-2xl transition-all duration-200 text-left flex flex-col gap-2
-                          ${complexity === cx.id
-                            ? 'border-loui-blue bg-white shadow-lg scale-[1.02]'
-                            : 'border-gray-200 hover:border-gray-400 bg-white/60'
+                          ${
+                            complexity === cx.id
+                              ? 'border-loui-blue bg-white shadow-lg scale-[1.02]'
+                              : 'border-gray-200 hover:border-gray-400 bg-white/60'
                           }`}
                       >
-                        <span className={`text-2xl font-display font-bold ${complexity === cx.id ? 'text-loui-blue' : 'text-loui-black'}`}>
-                          {cx.basePrice.toLocaleString()} ₽
-                        </span>
                         <span className="font-bold text-base">{cx.label}</span>
-                        <span className="text-sm text-gray-500 leading-snug">{cx.desc}</span>
+                        <span className="text-sm text-gray-500 leading-snug">
+                          {cx.desc}
+                        </span>
+                        <span
+                          className={`text-sm font-bold mt-1 ${
+                            complexity === cx.id
+                              ? 'text-loui-blue'
+                              : 'text-gray-400'
+                          }`}
+                        >
+                          от {cx.minPrice} ₽/шт
+                        </span>
                       </button>
                     ))}
                   </div>
+                  <p className="text-sm text-gray-400 mt-3">
+                    Чем больше тираж — тем ниже цена за штуку
+                  </p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -199,36 +280,33 @@ const Calculator: React.FC = () => {
               {step >= 4 && (
                 <motion.div {...fadeUp}>
                   <h3 className="text-lg font-bold uppercase mb-5 flex items-center gap-2">
-                    <StepBadge n={4} done={quantity > 0} />
-                    Количество: <span className="text-loui-blue">{quantity} шт.</span>
-                    {discountTier.label && (
-                      <span className="ml-2 rounded-full bg-green-100 px-3 py-0.5 text-xs font-bold text-green-700">
-                        {discountTier.label}
-                      </span>
-                    )}
+                    <StepBadge n={4} done={allSelected} />
+                    Количество:{' '}
+                    <span className="text-loui-blue">{effectiveQty} шт.</span>
                   </h3>
                   <div className="relative pt-2 pb-2">
                     <input
                       type="range"
                       min="1"
-                      max="50"
-                      value={quantity}
+                      max={maxQty}
+                      value={effectiveQty}
                       onChange={(e) => setQuantity(Number(e.target.value))}
                       className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-loui-blue"
                     />
                     <div className="flex justify-between text-xs text-gray-400 mt-3 font-mono">
                       <span>1 шт</span>
-                      <span>5 шт</span>
-                      <span>10 шт</span>
-                      <span>25 шт</span>
-                      <span>50 шт</span>
+                      {maxQty >= 10 && <span>10 шт</span>}
+                      {maxQty >= 25 && <span>25 шт</span>}
+                      <span>{maxQty} шт</span>
                     </div>
                   </div>
 
                   {/* Upload CTA */}
                   <div className="mt-8 rounded-2xl border-2 border-dashed border-gray-300 bg-white/60 p-6 text-center">
                     <Upload className="mx-auto mb-3 text-gray-400" size={28} />
-                    <p className="font-medium text-gray-700">Загрузите свой дизайн</p>
+                    <p className="font-medium text-gray-700">
+                      Загрузите свой дизайн
+                    </p>
                     <p className="text-sm text-gray-400 mt-1">
                       Мы оценим точную стоимость за&nbsp;10&nbsp;минут
                     </p>
@@ -257,90 +335,116 @@ const Calculator: React.FC = () => {
                   Расчёт стоимости
                 </h4>
 
-                {allSelected ? (
-                  <>
-                    {/* Breakdown */}
-                    <div className="space-y-3 text-sm mb-6 border-b border-gray-700 pb-6">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Дизайн</span>
-                        <span>{designLabel}</span>
+                <AnimatePresence mode="wait">
+                  {allSelected ? (
+                    <motion.div
+                      key="result"
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -12 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      {/* Breakdown */}
+                      <div className="space-y-3 text-sm mb-6 border-b border-gray-700 pb-6">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Дизайн</span>
+                          <span>{designLabel}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Расположение</span>
+                          <span>{placementLabel}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Сложность</span>
+                          <span>{complexityData?.label}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Количество</span>
+                          <span>{effectiveQty} шт.</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Расположение</span>
-                        <span>{placementLabel}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Сложность</span>
-                        <span>{complexityLabel}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Количество</span>
-                        <span>
-                          {quantity} шт.
-                          {discountTier.label && (
-                            <span className="ml-1 text-green-400">{discountTier.label}</span>
-                          )}
+
+                      {/* Prices */}
+                      <div className="flex justify-between items-end mb-3">
+                        <span className="text-gray-300">Цена за шт:</span>
+                        <span className="text-xl font-mono">
+                          {pricePerItem.toLocaleString()} ₽
                         </span>
                       </div>
-                    </div>
 
-                    {/* Prices */}
-                    <div className="flex justify-between items-end mb-3">
-                      <span className="text-gray-300">Цена за шт:</span>
-                      <span className="text-xl font-mono">{pricePerItem.toLocaleString()} ₽</span>
-                    </div>
+                      <div className="flex justify-between items-end mb-8">
+                        <span className="text-gray-300">Итого:</span>
+                        <motion.span
+                          key={totalPrice}
+                          initial={{ scale: 1.15, color: '#0047FF' }}
+                          animate={{ scale: 1, color: '#FFFFFF' }}
+                          className="text-4xl md:text-5xl font-bold font-display"
+                        >
+                          {totalPrice.toLocaleString()} ₽
+                        </motion.span>
+                      </div>
 
-                    <div className="flex justify-between items-end mb-8">
-                      <span className="text-gray-300">Итого:</span>
-                      <motion.span
-                        key={totalPrice}
-                        initial={{ scale: 1.15, color: '#0047FF' }}
-                        animate={{ scale: 1, color: '#FFFFFF' }}
-                        className="text-4xl md:text-5xl font-bold font-display"
-                      >
-                        {totalPrice.toLocaleString()} ₽
-                      </motion.span>
-                    </div>
+                      <button className="w-full bg-loui-blue text-white py-4 rounded-xl font-bold uppercase tracking-wider hover:bg-loui-orange transition-colors duration-300 mb-4">
+                        Забронировать цену
+                      </button>
 
-                    <button className="w-full bg-loui-blue text-white py-4 rounded-xl font-bold uppercase tracking-wider hover:bg-loui-orange transition-colors duration-300 mb-4">
-                      Забронировать цену
-                    </button>
+                      <button className="w-full flex items-center justify-center gap-2 border border-gray-600 text-gray-300 py-3 rounded-xl text-sm font-medium hover:border-white hover:text-white transition-colors">
+                        <MessageCircle size={16} />
+                        Помочь с выбором
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="text-center py-6"
+                    >
+                      <NeedleAnimation />
 
-                    <button className="w-full flex items-center justify-center gap-2 border border-gray-600 text-gray-300 py-3 rounded-xl text-sm font-medium hover:border-white hover:text-white transition-colors">
-                      <MessageCircle size={16} />
-                      Помочь с выбором
-                    </button>
-                  </>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="text-gray-500 mb-4 text-5xl font-display font-bold">
-                      ···
-                    </div>
-                    <p className="text-gray-400 text-sm">
-                      Выберите параметры,
-                      <br />
-                      чтобы увидеть цену
-                    </p>
-                    {step > 1 && (
-                      <div className="mt-6 flex items-center justify-center gap-1 text-xs text-gray-500">
+                      <p className="text-gray-300 text-sm font-medium mb-1">
+                        Ваша вышивка формируется
+                      </p>
+                      <p className="text-gray-500 text-xs mb-6">
+                        Выберите параметры слева
+                      </p>
+
+                      {/* Progress dots */}
+                      <div className="flex items-center justify-center gap-1.5">
                         {[1, 2, 3, 4].map((s) => (
-                          <React.Fragment key={s}>
-                            <span
-                              className={`h-2 rounded-full transition-all ${
-                                s < step ? 'w-6 bg-loui-blue' : s === step ? 'w-6 bg-gray-500' : 'w-2 bg-gray-700'
-                              }`}
-                            />
-                          </React.Fragment>
+                          <motion.span
+                            key={s}
+                            className="h-2 rounded-full"
+                            animate={{
+                              width: s < step ? 24 : s === step ? 24 : 8,
+                              backgroundColor:
+                                s < step
+                                  ? '#0047FF'
+                                  : s === step
+                                    ? '#6b7280'
+                                    : '#374151',
+                            }}
+                            transition={{ duration: 0.3 }}
+                          />
                         ))}
                       </div>
-                    )}
-                  </div>
-                )}
+
+                      <p className="text-gray-600 text-[10px] mt-3 uppercase tracking-wider">
+                        шаг {step} из 4
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <div className="bg-gray-900 rounded-lg p-3 flex gap-3 items-start mt-4">
-                  <AlertCircle className="text-loui-orange min-w-[20px]" size={20} />
+                  <AlertCircle
+                    className="text-loui-orange min-w-[20px]"
+                    size={20}
+                  />
                   <p className="text-xs text-gray-400 leading-tight">
-                    Цены ориентировочные. Для сложных дизайнов финальную цену утвердит технолог (Лёша).
+                    Цены ориентировочные. Для сложных дизайнов финальную цену
+                    утвердит технолог (Лёша).
                   </p>
                 </div>
               </div>
