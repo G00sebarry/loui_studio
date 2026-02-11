@@ -1,33 +1,10 @@
+// Legacy types (kept for backward compat)
 export type Complexity = 'easy' | 'medium' | 'hard';
-
-// Legacy – kept for backward compat if needed
 export type ItemType = 'apron' | 'hoodie' | 'shirt' | 'cut';
-
-// ── New calculator types ────────────────────────────────
-
-/** Шаг 1 — Что хотите вышить? */
-export type DesignType = 'logo' | 'large' | 'small';
-
-/** Шаг 2 — Где будет вышивка? */
-export type Placement =
-  | 'chest_left'
-  | 'chest_center'
-  | 'chest_right'
-  | 'back'
-  | 'sleeve'
-  | 'collar'
-  | 'hood'
-  | 'pants'
-  | 'cut';
-
-/** Шаг 3 — Сложность дизайна */
-export type DesignComplexity = 'simple' | 'medium' | 'complex';
-
-// ── Pricing helpers ─────────────────────────────────────
 
 export interface PriceTier {
   min: number;
-  max: number | null; // null means infinite/max
+  max: number | null;
   price: number;
 }
 
@@ -39,3 +16,32 @@ export interface NavItem {
   label: string;
   href: string;
 }
+
+// ── New calculator types ────────────────────────────────
+
+/** Шаг 1 — Тип изделия */
+export type GarmentType =
+  | 'hoodie'
+  | 'shirt'
+  | 'tshirt'
+  | 'sweatshirt'
+  | 'pants'
+  | 'shorts'
+  | 'cap'
+  | 'apron'
+  | 'fabric';
+
+/** Ракурс изделия */
+export type GarmentAngle = 'front' | 'back' | 'sleeve';
+
+/** Шаг 2 — Расположение вышивки */
+export type Placement =
+  | 'chest_left'
+  | 'chest_center'
+  | 'chest_right'
+  | 'back'
+  | 'sleeve'
+  | 'other';
+
+/** Шаг 3 — Сложность дизайна */
+export type DesignComplexity = 'simple' | 'medium' | 'complex';

@@ -1,4 +1,10 @@
-import { NavItem, DesignType, Placement, DesignComplexity } from './types';
+import {
+  NavItem,
+  GarmentType,
+  GarmentAngle,
+  Placement,
+  DesignComplexity,
+} from './types';
 
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Преимущества', href: '#features' },
@@ -7,7 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Контакты', href: '#footer' },
 ];
 
-// ── Actual pricing tiers (+10% от текущих цен, округлено до 10) ──
+// ── Pricing tiers (реальный прайс +10%, округлено до 10₽) ──
 
 export interface CalcTier {
   min: number;
@@ -56,85 +62,102 @@ export const CALC_PRICING: Record<DesignComplexity, CalcTier[]> = {
     { min: 7, max: 7, price: 880 },
     { min: 8, max: 8, price: 830 },
     { min: 9, max: 9, price: 770 },
-    { min: 10, max: 10, price: 720 },
+    { min: 10, max: 20, price: 720 },
+    // экстраполяция для тиражей >10
+    { min: 21, max: 29, price: 690 },
+    { min: 30, max: 39, price: 660 },
+    { min: 40, max: 50, price: 630 },
   ],
 };
 
-// ── Calculator UI data ──────────────────────────────────
+/** Lookup price from tier table */
+export function lookupPrice(
+  complexity: DesignComplexity,
+  qty: number,
+): number {
+  const tiers = CALC_PRICING[complexity];
+  const tier = tiers.find((t) => qty >= t.min && qty <= t.max);
+  return tier?.price ?? 0;
+}
 
-/** Шаг 1 — Что хотите вышить? */
-export const DESIGN_TYPES: {
-  id: DesignType;
+// ── Garments (Шаг 1) ───────────────────────────────────
+
+export interface GarmentInfo {
+  id: GarmentType;
   label: string;
-  desc: string;
-}[] = [
+  /** Доступные ракурсы (front есть всегда) */
+  angles: GarmentAngle[];
+}
+
+export const GARMENTS: GarmentInfo[] = [
+  { id: 'hoodie', label: 'Худи', angles: ['front', 'back', 'sleeve'] },
+  { id: 'shirt', label: 'Рубашка', angles: ['front', 'back', 'sleeve'] },
+  { id: 'tshirt', label: 'Футболка', angles: ['front', 'back', 'sleeve'] },
   {
-    id: 'logo',
-    label: 'Логотип / Надпись',
-    desc: 'Лого, надпись, эмблема — до 10 см',
+    id: 'sweatshirt',
+    label: 'Свитшот',
+    angles: ['front', 'back', 'sleeve'],
   },
-  {
-    id: 'large',
-    label: 'Крупный дизайн',
-    desc: 'Спина, большой рисунок — до 27 см',
-  },
-  {
-    id: 'small',
-    label: 'Мелкие детали',
-    desc: 'Имя, небольшая иконка, инициалы',
-  },
+  { id: 'pants', label: 'Штаны', angles: ['front', 'back'] },
+  { id: 'shorts', label: 'Шорты', angles: ['front', 'back'] },
+  { id: 'cap', label: 'Бейсболка', angles: ['front', 'back'] },
+  { id: 'apron', label: 'Фартук', angles: ['front'] },
+  { id: 'fabric', label: 'Крой', angles: ['front'] },
 ];
 
-/** Шаг 2 — Где будет вышивка? */
-export const PLACEMENTS: {
-  id: Placement;
-  label: string;
-}[] = [
+/** Путь к изображению изделия */
+export function garmentImagePath(
+  id: GarmentType,
+  angle: GarmentAngle,
+): string {
+  return `/items/${id}-${angle}.png`;
+}
+
+/** Какой ракурс показывать при выборе расположения */
+export const PLACEMENT_TO_ANGLE: Record<Placement, GarmentAngle> = {
+  chest_left: 'front',
+  chest_center: 'front',
+  chest_right: 'front',
+  back: 'back',
+  sleeve: 'sleeve',
+  other: 'front',
+};
+
+// ── Placements (Шаг 2) ─────────────────────────────────
+
+export const PLACEMENTS: { id: Placement; label: string }[] = [
   { id: 'chest_left', label: 'Грудь слева' },
   { id: 'chest_center', label: 'Грудь по центру' },
   { id: 'chest_right', label: 'Грудь справа' },
   { id: 'back', label: 'Спина' },
   { id: 'sleeve', label: 'Рукав' },
-  { id: 'collar', label: 'Воротник' },
-  { id: 'hood', label: 'Капюшон' },
-  { id: 'pants', label: 'Штаны / Шорты' },
-  { id: 'cut', label: 'Крой (отдельная ткань)' },
+  { id: 'other', label: 'Другое' },
 ];
 
-/** Шаг 3 — Сложность дизайна */
+// ── Complexity (Шаг 3) ─────────────────────────────────
+
 export const DESIGN_COMPLEXITY: {
   id: DesignComplexity;
   label: string;
   desc: string;
-  minPrice: number;   // мин. цена за шт (при макс. кол-ве) — для отображения
-  maxQty: number;     // макс. количество в слайдере
+  minPrice: number;
 }[] = [
   {
     id: 'simple',
-    label: 'Простой',
-    desc: 'Текст, логотип из 1–2 цветов, без заливки (5–15 см)',
+    label: 'Простая',
+    desc: 'Лого, надпись, имя. Без заливки. 1–2 цвета. До 10 см',
     minPrice: 330,
-    maxQty: 50,
   },
   {
     id: 'medium',
-    label: 'Средний',
-    desc: 'Лого с заливкой, надписи >15 см, 3–5 цветов',
+    label: 'Средняя',
+    desc: 'Лого или надпись с заливкой. 3–5 цветов. До 15 см',
     minPrice: 440,
-    maxQty: 50,
   },
   {
     id: 'complex',
-    label: 'Сложный',
-    desc: 'Детализированная вышивка, градиенты, много цветов',
-    minPrice: 720,
-    maxQty: 10,
+    label: 'Сложная',
+    desc: 'Большой рисунок, детализация, много цветов. До 30 см',
+    minPrice: 630,
   },
 ];
-
-/** Lookup price from tier table */
-export function lookupPrice(complexity: DesignComplexity, qty: number): number {
-  const tiers = CALC_PRICING[complexity];
-  const tier = tiers.find((t) => qty >= t.min && qty <= t.max);
-  return tier?.price ?? 0;
-}
