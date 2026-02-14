@@ -1,49 +1,44 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  AlertCircle,
   Upload,
   MessageCircle,
   Check,
   Info,
+  Plus,
+  Minus,
+  Gift,
+  Palette,
 } from 'lucide-react';
-import {
-  GarmentType,
-  GarmentAngle,
-  Placement,
-  DesignComplexity,
-} from '../types';
+import { GarmentType, GarmentOrder, DesignComplexity } from '../types';
 import {
   GARMENTS,
-  PLACEMENTS,
   DESIGN_COMPLEXITY,
   lookupPrice,
   garmentImagePath,
-  PLACEMENT_TO_ANGLE,
+  CUSTOM_PLACEMENT_SURCHARGE,
 } from '../constants';
 
-/* ─── helpers ─── */
+/* ─── small helpers ─── */
 const fadeUp = {
-  initial: { opacity: 0, y: 16 },
+  initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -8 },
-  transition: { duration: 0.35 },
+  transition: { duration: 0.3 },
 };
 
-/* ─── step badge ─── */
 const StepBadge: React.FC<{ n: number; done: boolean }> = ({ n, done }) => (
   <span
-    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
       done ? 'bg-loui-blue text-white' : 'bg-loui-black text-white'
     }`}
   >
-    {done ? <Check size={14} /> : n}
+    {done ? <Check size={12} /> : n}
   </span>
 );
 
-/* ─── animated needle for empty state ─── */
 const NeedleAnimation: React.FC = () => (
-  <div className="relative w-20 h-20 mx-auto mb-4">
+  <div className="relative w-16 h-16 mx-auto mb-3">
     <motion.svg viewBox="0 0 80 80" className="w-full h-full">
       <motion.path
         d="M 10 60 Q 25 20, 40 40 Q 55 60, 70 25"
@@ -61,252 +56,298 @@ const NeedleAnimation: React.FC = () => (
         animate={{ cx: [10, 40, 70, 40, 10], cy: [60, 40, 25, 40, 60] }}
         transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
       />
-      {[
-        { cx: 20, cy: 38, delay: 0.5 },
-        { cx: 35, cy: 42, delay: 1.0 },
-        { cx: 50, cy: 35, delay: 1.5 },
-        { cx: 62, cy: 30, delay: 2.0 },
-      ].map((dot, i) => (
-        <motion.circle
-          key={i}
-          cx={dot.cx}
-          cy={dot.cy}
-          r="1.5"
-          fill="#0047FF"
-          initial={{ opacity: 0, scale: 0 }}
-          animate={{ opacity: [0, 0.6, 0], scale: [0, 1, 0] }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            delay: dot.delay,
-            ease: 'easeInOut',
-          }}
-        />
-      ))}
     </motion.svg>
   </div>
 );
 
-/* ━━━ MAIN COMPONENT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Quantity stepper marks */
+const QTY_MARKS = [1, 5, 10, 20, 30, 50];
+
+/* ━━━ MAIN ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 const Calculator: React.FC = () => {
-  const [selectedGarments, setSelectedGarments] = useState<GarmentType[]>([]);
-  const [placement, setPlacement] = useState<Placement | null>(null);
+  /* ── state ── */
+  const [orders, setOrders] = useState<GarmentOrder[]>([]);
+  const [activeIdx, setActiveIdx] = useState(0);
   const [complexity, setComplexity] = useState<DesignComplexity | null>(null);
-  const [quantity, setQuantity] = useState<number>(1);
+  const [customQty, setCustomQty] = useState(false);
+  const [customQtyValue, setCustomQtyValue] = useState('');
 
-  /* toggle garment selection */
-  const toggleGarment = (id: GarmentType) => {
-    setSelectedGarments((prev) =>
-      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id],
-    );
-  };
+  /* ── derived ── */
+  const activeOrder = orders[activeIdx] ?? null;
+  const hasOrders = orders.length > 0;
+  const allPlaced = hasOrders && orders.every((o) => o.placement !== null);
+  const allReady = allPlaced && complexity !== null;
 
-  /* derived state */
-  const hasGarments = selectedGarments.length > 0;
-  const step = !hasGarments
-    ? 1
-    : placement === null
-      ? 2
-      : complexity === null
-        ? 3
-        : 4;
-
-  const allSelected = hasGarments && placement !== null && complexity !== null;
-
-  /* Which garment to preview (last selected) */
-  const previewGarment = hasGarments
-    ? GARMENTS.find(
-        (g) => g.id === selectedGarments[selectedGarments.length - 1],
-      )
+  const activeGarment = activeOrder
+    ? GARMENTS.find((g) => g.id === activeOrder.garment)!
     : null;
 
-  /* What angle to show based on placement */
-  const previewAngle: GarmentAngle = useMemo(() => {
-    if (!placement || !previewGarment) return 'front';
-    const desired = PLACEMENT_TO_ANGLE[placement];
-    return previewGarment.angles.includes(desired) ? desired : 'front';
-  }, [placement, previewGarment]);
+  /* current step */
+  const step = !hasOrders ? 1 : !allPlaced ? 2 : complexity === null ? 3 : 4;
 
-  /* Pricing */
-  const { pricePerItem, totalPrice } = useMemo(() => {
-    if (!allSelected) return { pricePerItem: 0, totalPrice: 0 };
-    const perItem = lookupPrice(complexity, quantity);
-    return { pricePerItem: perItem, totalPrice: perItem * quantity };
-  }, [complexity, quantity, allSelected]);
+  /* ── garment toggle ── */
+  const toggleGarment = (id: GarmentType) => {
+    setOrders((prev) => {
+      const exists = prev.findIndex((o) => o.garment === id);
+      if (exists !== -1) {
+        const next = prev.filter((_, i) => i !== exists);
+        if (activeIdx >= next.length) setActiveIdx(Math.max(0, next.length - 1));
+        return next;
+      }
+      const next = [...prev, { garment: id, placement: null, quantity: 1 }];
+      setActiveIdx(next.length - 1);
+      return next;
+    });
+  };
 
-  /* Labels */
-  const placementLabel = PLACEMENTS.find((p) => p.id === placement)?.label;
-  const complexityData = DESIGN_COMPLEXITY.find((c) => c.id === complexity);
-  const garmentLabels = selectedGarments
-    .map((id) => GARMENTS.find((g) => g.id === id)?.label)
-    .filter(Boolean);
+  /* ── update order ── */
+  const updateOrder = (idx: number, patch: Partial<GarmentOrder>) => {
+    setOrders((prev) => prev.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
+  };
+
+  /* ── pricing ── */
+  const pricing = useMemo(() => {
+    if (!allReady) return { lines: [] as any[], total: 0 };
+
+    const lines = orders.map((o) => {
+      const g = GARMENTS.find((g) => g.id === o.garment)!;
+      const pl = g.placements.find((p) => p.id === o.placement);
+      const base = lookupPrice(complexity, o.quantity);
+      const surcharge = pl?.isCustom ? Math.round(base * CUSTOM_PLACEMENT_SURCHARGE) : 0;
+      const perItem = base + surcharge;
+      return {
+        garment: g.label,
+        placement: pl?.label ?? '',
+        qty: o.quantity,
+        perItem,
+        subtotal: perItem * o.quantity,
+        hasSurcharge: !!pl?.isCustom,
+      };
+    });
+
+    return { lines, total: lines.reduce((s, l) => s + l.subtotal, 0) };
+  }, [orders, complexity, allReady]);
+
+  /* ── preview image ── */
+  const previewSrc = activeGarment
+    ? garmentImagePath(activeOrder!.garment, activeOrder!.placement)
+    : null;
 
   return (
-    <section
-      id="calculator"
-      className="py-24 px-6 md:px-12 lg:px-20 bg-loui-bg relative"
-    >
-      <div className="max-w-6xl mx-auto">
+    <section id="calculator" className="py-16 md:py-24 px-4 md:px-8 lg:px-12 bg-loui-bg">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
-          className="mb-14"
+          className="mb-10"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
         >
-          <h2 className="text-4xl md:text-6xl font-display font-bold mb-4">
+          <h2 className="text-3xl md:text-5xl lg:text-6xl font-display font-bold mb-3">
             КАЛЬКУЛЯТОР <span className="text-loui-blue">ЦЕНЫ</span>
           </h2>
-          <p className="text-xl text-gray-500">
+          <p className="text-lg text-gray-500">
             Узнай цену быстрее, чем заварится эспрессо.
           </p>
         </motion.div>
 
-        <div className="flex flex-col lg:flex-row gap-12">
-          {/* ─── Left: Steps ─── */}
-          <div className="w-full lg:w-2/3 space-y-10">
-            {/* STEP 1 — Тип изделия (3×3 grid) */}
-            <div>
-              <h3 className="text-lg font-bold uppercase mb-5 flex items-center gap-2">
-                <StepBadge n={1} done={hasGarments} />
-                Тип изделия
-                {hasGarments && (
-                  <span className="text-sm font-normal normal-case text-gray-400 ml-2">
-                    (можно несколько)
-                  </span>
-                )}
-              </h3>
-              <div className="grid grid-cols-3 gap-3 max-w-md">
-                {GARMENTS.map((g) => {
-                  const isSelected = selectedGarments.includes(g.id);
-                  return (
-                    <button
-                      key={g.id}
-                      onClick={() => toggleGarment(g.id)}
-                      className="relative aspect-square overflow-hidden rounded-xl group"
-                    >
-                      {/* Garment image background */}
-                      <img
-                        src={garmentImagePath(g.id, 'front')}
-                        alt={g.label}
-                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      />
-                      {/* Default subtle overlay */}
-                      <div
-                        className={`absolute inset-0 transition-all duration-300 ${
-                          isSelected
-                            ? 'bg-loui-blue/30'
-                            : 'bg-black/10 group-hover:bg-black/40'
-                        }`}
-                      />
-                      {/* Selected border */}
-                      <div
-                        className={`absolute inset-0 rounded-xl border-3 transition-colors duration-200 ${
-                          isSelected
-                            ? 'border-loui-blue'
-                            : 'border-transparent'
-                        }`}
-                      />
-                      {/* Checkmark */}
-                      {isSelected && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="absolute top-1.5 right-1.5 w-5 h-5 bg-loui-blue rounded-full flex items-center justify-center"
-                        >
-                          <Check size={12} className="text-white" />
-                        </motion.div>
-                      )}
-                      {/* Label on hover / always when selected */}
-                      <div
-                        className={`absolute inset-x-0 bottom-0 px-2 py-1.5 text-center transition-all duration-300 ${
-                          isSelected
-                            ? 'opacity-100 bg-loui-blue/80'
-                            : 'opacity-0 group-hover:opacity-100 bg-black/60'
-                        }`}
-                      >
-                        <span className="text-white text-xs font-bold uppercase tracking-wide">
-                          {g.label}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+        {/* ─── 3-column grid (desktop) ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_300px] gap-6 items-start">
 
-            {/* STEP 2 — Расположение вышивки */}
+          {/* ══ COL 1: Garment tiles ══ */}
+          <div>
+            <h3 className="text-sm font-bold uppercase mb-3 flex items-center gap-2">
+              <StepBadge n={1} done={hasOrders} />
+              Изделие
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {GARMENTS.map((g) => {
+                const isSelected = orders.some((o) => o.garment === g.id);
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => toggleGarment(g.id)}
+                    className="relative aspect-square overflow-hidden rounded-lg group"
+                  >
+                    <img
+                      src={garmentImagePath(g.id)}
+                      alt={g.label}
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    />
+                    <div
+                      className={`absolute inset-0 transition-all duration-300 ${
+                        isSelected ? 'bg-loui-blue/25' : 'bg-black/5 group-hover:bg-black/35'
+                      }`}
+                    />
+                    {isSelected && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute top-1 right-1 w-4 h-4 bg-loui-blue rounded-full flex items-center justify-center"
+                      >
+                        <Check size={10} className="text-white" />
+                      </motion.div>
+                    )}
+                    <div
+                      className={`absolute inset-x-0 bottom-0 px-1 py-1 text-center transition-opacity duration-300 ${
+                        isSelected ? 'opacity-100 bg-loui-blue/80' : 'opacity-0 group-hover:opacity-100 bg-black/60'
+                      }`}
+                    >
+                      <span className="text-white text-[10px] font-bold uppercase leading-none">
+                        {g.label}
+                      </span>
+                    </div>
+                    <div
+                      className={`absolute inset-0 rounded-lg border-2 pointer-events-none transition-colors ${
+                        isSelected ? 'border-loui-blue' : 'border-transparent'
+                      }`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            {hasOrders && (
+              <p className="text-[11px] text-gray-400 mt-2 text-center">
+                Выбрано: {orders.length}
+              </p>
+            )}
+          </div>
+
+          {/* ══ COL 2: Steps (placement → complexity → qty) ══ */}
+          <div className="space-y-8 min-w-0">
+            {/* ── Per-garment tabs + placement ── */}
             <AnimatePresence>
               {step >= 2 && (
                 <motion.div {...fadeUp}>
-                  <h3 className="text-lg font-bold uppercase mb-5 flex items-center gap-2">
-                    <StepBadge n={2} done={placement !== null} />
+                  <h3 className="text-sm font-bold uppercase mb-3 flex items-center gap-2">
+                    <StepBadge n={2} done={allPlaced} />
                     Расположение вышивки
                   </h3>
-                  <div className="flex flex-wrap gap-3">
-                    {PLACEMENTS.map((pl) => (
+
+                  {/* Garment tabs */}
+                  {orders.length > 1 && (
+                    <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+                      {orders.map((o, i) => {
+                        const g = GARMENTS.find((g) => g.id === o.garment)!;
+                        return (
+                          <button
+                            key={o.garment}
+                            onClick={() => setActiveIdx(i)}
+                            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                              i === activeIdx
+                                ? 'bg-loui-blue text-white'
+                                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                            }`}
+                          >
+                            {g.label}
+                            {o.placement && <Check size={10} className="inline ml-1 -mt-0.5" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Placement options for active garment */}
+                  {activeGarment && (
+                    <div className="flex flex-wrap gap-2">
+                      {activeGarment.placements.map((pl) => (
+                        <button
+                          key={pl.id}
+                          onClick={() => updateOrder(activeIdx, { placement: pl.id })}
+                          className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all duration-200
+                            ${
+                              activeOrder?.placement === pl.id
+                                ? 'border-loui-blue bg-white text-loui-blue shadow-sm'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white/60'
+                            }
+                            ${pl.isCustom ? 'italic' : ''}`}
+                        >
+                          {pl.label}
+                          {pl.isCustom && (
+                            <span className="text-[10px] ml-1 text-gray-400">(+10%)</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Per-garment quantity */}
+                  {activeOrder?.placement && (
+                    <div className="mt-4 flex items-center gap-3">
+                      <span className="text-sm text-gray-500">Кол-во:</span>
                       <button
-                        key={pl.id}
-                        onClick={() => setPlacement(pl.id)}
-                        className={`px-5 py-3 rounded-xl border-2 text-sm font-medium transition-all duration-200
-                          ${
-                            placement === pl.id
-                              ? 'border-loui-blue bg-white text-loui-blue shadow-md'
-                              : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white/60'
-                          }`}
+                        onClick={() =>
+                          updateOrder(activeIdx, {
+                            quantity: Math.max(1, (activeOrder?.quantity ?? 1) - 1),
+                          })
+                        }
+                        className="w-8 h-8 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-100"
                       >
-                        {pl.label}
+                        <Minus size={14} />
                       </button>
-                    ))}
-                  </div>
+                      <input
+                        type="number"
+                        min={1}
+                        value={activeOrder.quantity}
+                        onChange={(e) => {
+                          const v = Math.max(1, parseInt(e.target.value) || 1);
+                          updateOrder(activeIdx, { quantity: v });
+                        }}
+                        className="w-16 text-center border border-gray-300 rounded-lg py-1.5 text-sm font-bold"
+                      />
+                      <button
+                        onClick={() =>
+                          updateOrder(activeIdx, {
+                            quantity: (activeOrder?.quantity ?? 1) + 1,
+                          })
+                        }
+                        className="w-8 h-8 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-100"
+                      >
+                        <Plus size={14} />
+                      </button>
+                      <span className="text-xs text-gray-400">шт.</span>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* STEP 3 — Сложность */}
+            {/* ── Complexity ── */}
             <AnimatePresence>
               {step >= 3 && (
                 <motion.div {...fadeUp}>
-                  <h3 className="text-lg font-bold uppercase mb-5 flex items-center gap-2">
+                  <h3 className="text-sm font-bold uppercase mb-3 flex items-center gap-2">
                     <StepBadge n={3} done={complexity !== null} />
                     Сложность дизайна
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {DESIGN_COMPLEXITY.map((cx) => (
                       <button
                         key={cx.id}
                         onClick={() => setComplexity(cx.id)}
-                        className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-200 text-left flex flex-col
+                        className={`relative overflow-hidden rounded-xl border-2 transition-all duration-200 text-left flex flex-col
                           ${
                             complexity === cx.id
                               ? 'border-loui-blue bg-white shadow-lg scale-[1.02]'
                               : 'border-gray-200 hover:border-gray-400 bg-white/60'
                           }`}
                       >
-                        {/* Example image placeholder */}
-                        <div className="h-28 bg-gray-100 flex items-center justify-center overflow-hidden">
+                        <div className="h-24 bg-gray-100 overflow-hidden">
                           <img
                             src={`/items/complexity-${cx.id}.png`}
                             alt={cx.label}
                             className="h-full w-full object-cover"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).style.display =
-                                'none';
+                              (e.target as HTMLImageElement).style.display = 'none';
                             }}
                           />
                         </div>
-                        <div className="p-4 flex flex-col gap-1.5">
-                          <span className="font-bold text-base">
-                            {cx.label}
-                          </span>
-                          <span className="text-sm text-gray-500 leading-snug">
-                            {cx.desc}
-                          </span>
+                        <div className="p-3 flex flex-col gap-1">
+                          <span className="font-bold text-sm">{cx.label}</span>
+                          <span className="text-xs text-gray-500 leading-snug">{cx.desc}</span>
                           <span
-                            className={`text-sm font-bold mt-1 ${
-                              complexity === cx.id
-                                ? 'text-loui-blue'
-                                : 'text-gray-400'
+                            className={`text-xs font-bold mt-0.5 ${
+                              complexity === cx.id ? 'text-loui-blue' : 'text-gray-400'
                             }`}
                           >
                             от {cx.minPrice} ₽/шт
@@ -315,245 +356,203 @@ const Calculator: React.FC = () => {
                       </button>
                     ))}
                   </div>
-                  <p className="text-sm text-gray-400 mt-3">
+                  <p className="text-xs text-gray-400 mt-2">
                     Чем больше тираж — тем ниже цена за штуку
                   </p>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* STEP 4 — Количество */}
+            {/* ── Upload + bonuses ── */}
             <AnimatePresence>
               {step >= 4 && (
-                <motion.div {...fadeUp}>
-                  <h3 className="text-lg font-bold uppercase mb-5 flex items-center gap-2">
-                    <StepBadge n={4} done={allSelected} />
-                    Количество:{' '}
-                    <span className="text-loui-blue">{quantity} шт.</span>
-                  </h3>
-                  <div className="relative pt-2 pb-2">
-                    <input
-                      type="range"
-                      min="1"
-                      max="50"
-                      value={quantity}
-                      onChange={(e) => setQuantity(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-loui-blue"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400 mt-3 font-mono">
-                      <span>1</span>
-                      <span>10</span>
-                      <span>25</span>
-                      <span>50</span>
-                    </div>
-                  </div>
-
-                  {/* Upload CTA */}
-                  <div className="mt-8 rounded-2xl border-2 border-dashed border-gray-300 bg-white/60 p-6 text-center">
-                    <Upload className="mx-auto mb-3 text-gray-400" size={28} />
-                    <p className="font-medium text-gray-700">
-                      Загрузите свой дизайн
-                    </p>
-                    <p className="text-sm text-gray-400 mt-1">
+                <motion.div {...fadeUp} className="space-y-4">
+                  {/* Upload */}
+                  <div className="rounded-xl border-2 border-dashed border-gray-300 bg-white/60 p-5 text-center">
+                    <Upload className="mx-auto mb-2 text-gray-400" size={24} />
+                    <p className="font-medium text-sm text-gray-700">Загрузите свой дизайн</p>
+                    <p className="text-xs text-gray-400 mt-1">
                       Мы оценим точную стоимость за&nbsp;10&nbsp;минут
                     </p>
-                    <button className="mt-4 inline-flex items-center gap-2 rounded-xl border-2 border-loui-blue px-5 py-2.5 text-sm font-bold text-loui-blue hover:bg-loui-blue hover:text-white transition-colors">
-                      <Upload size={16} />
+                    <button className="mt-3 inline-flex items-center gap-2 rounded-lg border-2 border-loui-blue px-4 py-2 text-xs font-bold text-loui-blue hover:bg-loui-blue hover:text-white transition-colors">
+                      <Upload size={14} />
                       Выбрать файл
                     </button>
+                  </div>
+
+                  {/* Bonuses row */}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
+                      <Gift size={16} className="text-loui-blue" />
+                      <span className="text-xs font-medium text-gray-700">
+                        Дизайн программы в подарок
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
+                      <Palette size={16} className="text-loui-blue" />
+                      <span className="text-xs font-medium text-gray-700">
+                        Подберём цвет нити под ваш макет
+                      </span>
+                    </div>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* ─── Right: Preview + Result Card ─── */}
-          <div className="w-full lg:w-1/3">
-            <div className="sticky top-24 space-y-4">
-              {/* Garment preview */}
-              <AnimatePresence>
-                {previewGarment && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="bg-white rounded-2xl overflow-hidden shadow-lg"
-                  >
-                    <div className="relative aspect-square bg-gray-50">
-                      <AnimatePresence mode="wait">
-                        <motion.img
-                          key={`${previewGarment.id}-${previewAngle}`}
-                          src={garmentImagePath(
-                            previewGarment.id,
-                            previewAngle,
-                          )}
-                          alt={previewGarment.label}
-                          className="h-full w-full object-contain p-4"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                        />
-                      </AnimatePresence>
-                    </div>
-                    {/* Selected garments row */}
-                    {selectedGarments.length > 1 && (
-                      <div className="flex gap-2 px-3 py-2 border-t border-gray-100 overflow-x-auto">
-                        {selectedGarments.map((id) => {
-                          const g = GARMENTS.find((g) => g.id === id)!;
-                          const isActive =
-                            id ===
-                            selectedGarments[selectedGarments.length - 1];
-                          return (
-                            <div
-                              key={id}
-                              className={`shrink-0 w-10 h-10 rounded-lg overflow-hidden border-2 transition-colors ${
-                                isActive
-                                  ? 'border-loui-blue'
-                                  : 'border-transparent opacity-50'
-                              }`}
-                            >
-                              <img
-                                src={garmentImagePath(id, 'front')}
-                                alt={g.label}
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Result card */}
-              <motion.div
-                className="bg-loui-black text-white p-8 rounded-3xl shadow-2xl overflow-hidden"
-                initial={{ scale: 0.95 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-loui-blue blur-[60px] opacity-40 rounded-full pointer-events-none" />
-
-                <div className="relative z-10">
-                  <h4 className="text-gray-400 text-sm uppercase tracking-widest mb-6">
-                    Расчёт стоимости
-                  </h4>
-
-                  <AnimatePresence mode="wait">
-                    {allSelected ? (
-                      <motion.div
-                        key="result"
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -12 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        {/* Breakdown */}
-                        <div className="space-y-3 text-sm mb-6 border-b border-gray-700 pb-6">
-                          <div className="flex justify-between gap-4">
-                            <span className="text-gray-400 shrink-0">
-                              Изделие
-                            </span>
-                            <span className="text-right">
-                              {garmentLabels.join(', ')}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-400">
-                              Расположение
-                            </span>
-                            <span>{placementLabel}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-400">Сложность</span>
-                            <span>{complexityData?.label}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-400">Количество</span>
-                            <span>{quantity} шт.</span>
-                          </div>
-                        </div>
-
-                        {/* Prices */}
-                        <div className="flex justify-between items-end mb-3">
-                          <span className="text-gray-300">Цена за шт:</span>
-                          <span className="text-xl font-mono">
-                            {pricePerItem.toLocaleString()} ₽
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-end mb-8">
-                          <span className="text-gray-300">Итого:</span>
-                          <motion.span
-                            key={totalPrice}
-                            initial={{ scale: 1.15, color: '#0047FF' }}
-                            animate={{ scale: 1, color: '#FFFFFF' }}
-                            className="text-4xl md:text-5xl font-bold font-display"
-                          >
-                            {totalPrice.toLocaleString()} ₽
-                          </motion.span>
-                        </div>
-
-                        <button className="w-full bg-loui-blue text-white py-4 rounded-xl font-bold uppercase tracking-wider hover:bg-loui-orange transition-colors duration-300 mb-4">
-                          Забронировать цену
-                        </button>
-
-                        <button className="w-full flex items-center justify-center gap-2 border border-gray-600 text-gray-300 py-3 rounded-xl text-sm font-medium hover:border-white hover:text-white transition-colors">
-                          <MessageCircle size={16} />
-                          Помочь с выбором
-                        </button>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="empty"
+          {/* ══ COL 3: Preview + Result ══ */}
+          <div className="space-y-4">
+            {/* Garment preview */}
+            <AnimatePresence>
+              {previewSrc && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-white rounded-xl overflow-hidden shadow-md"
+                >
+                  <div className="relative aspect-square bg-gray-50">
+                    <AnimatePresence mode="wait">
+                      <motion.img
+                        key={previewSrc}
+                        src={previewSrc}
+                        alt={activeGarment?.label}
+                        className="h-full w-full object-contain p-3"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="text-center py-6"
-                      >
-                        <NeedleAnimation />
-                        <p className="text-gray-300 text-sm font-medium mb-1">
-                          Ваша вышивка формируется
-                        </p>
-                        <p className="text-gray-500 text-xs mb-6">
-                          Выберите параметры слева
-                        </p>
-                        <div className="flex items-center justify-center gap-1.5">
-                          {[1, 2, 3, 4].map((s) => (
-                            <motion.span
-                              key={s}
-                              className="h-2 rounded-full"
-                              animate={{
-                                width: s < step ? 24 : s === step ? 24 : 8,
-                                backgroundColor:
-                                  s < step
-                                    ? '#0047FF'
-                                    : s === step
-                                      ? '#6b7280'
-                                      : '#374151',
-                              }}
-                              transition={{ duration: 0.3 }}
-                            />
-                          ))}
-                        </div>
-                        <p className="text-gray-600 text-[10px] mt-3 uppercase tracking-wider">
-                          шаг {step} из 4
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <div className="bg-gray-900 rounded-lg p-3 flex gap-3 items-start mt-4">
-                    <Info className="text-loui-orange min-w-[20px]" size={20} />
-                    <p className="text-xs text-gray-400 leading-tight">
-                      Цены ориентировочные. Для сложных дизайнов или больших
-                      тиражей финальную цену утвердит технолог.
-                    </p>
+                        transition={{ duration: 0.2 }}
+                      />
+                    </AnimatePresence>
                   </div>
+                  {orders.length > 1 && (
+                    <div className="flex gap-1.5 px-2 py-2 border-t border-gray-100 overflow-x-auto">
+                      {orders.map((o, i) => {
+                        const g = GARMENTS.find((g) => g.id === o.garment)!;
+                        return (
+                          <button
+                            key={o.garment}
+                            onClick={() => setActiveIdx(i)}
+                            className={`shrink-0 w-9 h-9 rounded-lg overflow-hidden border-2 transition-colors ${
+                              i === activeIdx ? 'border-loui-blue' : 'border-transparent opacity-50'
+                            }`}
+                          >
+                            <img
+                              src={garmentImagePath(o.garment)}
+                              alt={g.label}
+                              className="h-full w-full object-cover"
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Result card */}
+            <div className="bg-loui-black text-white p-6 rounded-2xl shadow-2xl overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-28 h-28 bg-loui-blue blur-[50px] opacity-40 rounded-full pointer-events-none" />
+
+              <div className="relative z-10">
+                <h4 className="text-gray-400 text-xs uppercase tracking-widest mb-4">
+                  Расчёт стоимости
+                </h4>
+
+                <AnimatePresence mode="wait">
+                  {allReady ? (
+                    <motion.div
+                      key="result"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      {/* Line items */}
+                      <div className="space-y-2 text-xs mb-4 border-b border-gray-700 pb-4">
+                        {pricing.lines.map((l, i) => (
+                          <div key={i} className="flex justify-between gap-2">
+                            <span className="text-gray-400 truncate">
+                              {l.garment} · {l.placement}
+                              {l.hasSurcharge && ' *'}
+                            </span>
+                            <span className="shrink-0">
+                              {l.qty} × {l.perItem.toLocaleString()} ₽
+                            </span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between text-gray-400">
+                          <span>Сложность</span>
+                          <span>{DESIGN_COMPLEXITY.find((c) => c.id === complexity)?.label}</span>
+                        </div>
+                      </div>
+
+                      {/* Total */}
+                      <div className="flex justify-between items-end mb-6">
+                        <span className="text-gray-300 text-sm">Итого:</span>
+                        <motion.span
+                          key={pricing.total}
+                          initial={{ scale: 1.1, color: '#0047FF' }}
+                          animate={{ scale: 1, color: '#FFFFFF' }}
+                          className="text-3xl font-bold font-display"
+                        >
+                          {pricing.total.toLocaleString()} ₽
+                        </motion.span>
+                      </div>
+
+                      <button className="w-full bg-loui-blue text-white py-3 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-loui-orange transition-colors duration-300 mb-3">
+                        Забронировать цену
+                      </button>
+                      <button className="w-full flex items-center justify-center gap-2 border border-gray-600 text-gray-300 py-2.5 rounded-xl text-xs font-medium hover:border-white hover:text-white transition-colors">
+                        <MessageCircle size={14} />
+                        Помочь с выбором
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="text-center py-4"
+                    >
+                      <NeedleAnimation />
+                      <p className="text-gray-300 text-sm font-medium mb-1">
+                        Ваша цена формируется
+                      </p>
+                      <p className="text-gray-500 text-[11px] mb-4">
+                        Выберите параметры слева
+                      </p>
+                      <div className="flex items-center justify-center gap-1.5">
+                        {[1, 2, 3, 4].map((s) => (
+                          <motion.span
+                            key={s}
+                            className="h-1.5 rounded-full"
+                            animate={{
+                              width: s < step ? 20 : s === step ? 20 : 6,
+                              backgroundColor:
+                                s < step ? '#0047FF' : s === step ? '#6b7280' : '#374151',
+                            }}
+                            transition={{ duration: 0.3 }}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-gray-600 text-[10px] mt-2 uppercase tracking-wider">
+                        шаг {step} из 4
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="bg-gray-900 rounded-lg p-2.5 flex gap-2 items-start mt-3">
+                  <Info className="text-loui-orange min-w-[16px]" size={16} />
+                  <p className="text-[10px] text-gray-400 leading-tight">
+                    Для сложных дизайнов, больших тиражей или нестандартного расположения
+                    финальную цену утвердит технолог.
+                  </p>
                 </div>
-              </motion.div>
+              </div>
             </div>
           </div>
         </div>

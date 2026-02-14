@@ -2,7 +2,6 @@ import {
   NavItem,
   GarmentType,
   GarmentAngle,
-  Placement,
   DesignComplexity,
 } from './types';
 
@@ -63,7 +62,6 @@ export const CALC_PRICING: Record<DesignComplexity, CalcTier[]> = {
     { min: 8, max: 8, price: 830 },
     { min: 9, max: 9, price: 770 },
     { min: 10, max: 20, price: 720 },
-    // экстраполяция для тиражей >10
     { min: 21, max: 29, price: 690 },
     { min: 30, max: 39, price: 660 },
     { min: 40, max: 50, price: 630 },
@@ -80,61 +78,128 @@ export function lookupPrice(
   return tier?.price ?? 0;
 }
 
-// ── Garments (Шаг 1) ───────────────────────────────────
+// ── Garments ────────────────────────────────────────────
+
+export interface PlacementOption {
+  id: string;
+  label: string;
+  /** Ракурс превью при выборе этого расположения */
+  angle: GarmentAngle;
+  /** Является ли нестандартным (+10%) */
+  isCustom?: boolean;
+}
 
 export interface GarmentInfo {
   id: GarmentType;
   label: string;
-  /** Доступные ракурсы (front есть всегда) */
-  angles: GarmentAngle[];
+  placements: PlacementOption[];
 }
 
 export const GARMENTS: GarmentInfo[] = [
-  { id: 'hoodie', label: 'Худи', angles: ['front', 'back', 'sleeve'] },
-  { id: 'shirt', label: 'Рубашка', angles: ['front', 'back', 'sleeve'] },
-  { id: 'tshirt', label: 'Футболка', angles: ['front', 'back', 'sleeve'] },
+  {
+    id: 'hoodie',
+    label: 'Худи',
+    placements: [
+      { id: 'chest_left', label: 'Грудь слева', angle: 'front' },
+      { id: 'chest_right', label: 'Грудь справа', angle: 'front' },
+      { id: 'chest_center', label: 'Грудь по центру', angle: 'front' },
+      { id: 'back', label: 'Спина', angle: 'back' },
+      { id: 'other', label: 'Другое', angle: 'front', isCustom: true },
+    ],
+  },
+  {
+    id: 'shirt',
+    label: 'Рубашка',
+    placements: [
+      { id: 'chest_left', label: 'Грудь слева', angle: 'front' },
+      { id: 'chest_right', label: 'Грудь справа', angle: 'front' },
+      { id: 'back', label: 'Спина', angle: 'back' },
+      { id: 'sleeve', label: 'Рукав', angle: 'sleeve' },
+      { id: 'other', label: 'Другое', angle: 'front', isCustom: true },
+    ],
+  },
+  {
+    id: 'tshirt',
+    label: 'Футболка',
+    placements: [
+      { id: 'chest_left', label: 'Грудь слева', angle: 'front' },
+      { id: 'chest_right', label: 'Грудь справа', angle: 'front' },
+      { id: 'chest_center', label: 'Грудь по центру', angle: 'front' },
+      { id: 'back', label: 'Спина', angle: 'back' },
+      { id: 'other', label: 'Другое', angle: 'front', isCustom: true },
+    ],
+  },
   {
     id: 'sweatshirt',
     label: 'Свитшот',
-    angles: ['front', 'back', 'sleeve'],
+    placements: [
+      { id: 'chest_left', label: 'Грудь слева', angle: 'front' },
+      { id: 'chest_right', label: 'Грудь справа', angle: 'front' },
+      { id: 'chest_center', label: 'Грудь по центру', angle: 'front' },
+      { id: 'back', label: 'Спина', angle: 'back' },
+      { id: 'other', label: 'Другое', angle: 'front', isCustom: true },
+    ],
   },
-  { id: 'pants', label: 'Штаны', angles: ['front', 'back'] },
-  { id: 'shorts', label: 'Шорты', angles: ['front', 'back'] },
-  { id: 'cap', label: 'Бейсболка', angles: ['front', 'back'] },
-  { id: 'apron', label: 'Фартук', angles: ['front'] },
-  { id: 'fabric', label: 'Крой', angles: ['front'] },
+  {
+    id: 'pants',
+    label: 'Штаны',
+    placements: [
+      { id: 'pocket_left', label: 'Под карманом слева', angle: 'front' },
+      { id: 'pocket_right', label: 'Под карманом справа', angle: 'front' },
+      { id: 'other', label: 'Другое', angle: 'front', isCustom: true },
+    ],
+  },
+  {
+    id: 'shorts',
+    label: 'Шорты',
+    placements: [
+      { id: 'pocket_left', label: 'Под карманом слева', angle: 'front' },
+      { id: 'pocket_right', label: 'Под карманом справа', angle: 'front' },
+      { id: 'other', label: 'Другое', angle: 'front', isCustom: true },
+    ],
+  },
+  {
+    id: 'cap',
+    label: 'Бейсболка',
+    placements: [
+      { id: 'center', label: 'По центру', angle: 'front' },
+      { id: 'back', label: 'Сзади', angle: 'back' },
+      { id: 'other', label: 'Другое', angle: 'front', isCustom: true },
+    ],
+  },
+  {
+    id: 'apron',
+    label: 'Фартук',
+    placements: [
+      { id: 'center', label: 'По центру', angle: 'front' },
+      { id: 'other', label: 'Другое', angle: 'front', isCustom: true },
+    ],
+  },
+  {
+    id: 'fabric',
+    label: 'Крой',
+    placements: [
+      { id: 'upload', label: 'Загрузить макет', angle: 'front' },
+    ],
+  },
 ];
 
-/** Путь к изображению изделия */
+/**
+ * Путь к изображению изделия.
+ * С расположением: /items/{garment}-{placementId}.png (пунктирная область)
+ * Без расположения: /items/{garment}-front.png (обычный вид)
+ */
 export function garmentImagePath(
   id: GarmentType,
-  angle: GarmentAngle,
+  placementId?: string | null,
 ): string {
-  return `/items/${id}-${angle}.png`;
+  if (placementId && placementId !== 'other' && placementId !== 'upload') {
+    return `/items/${id}-${placementId}.png`;
+  }
+  return `/items/${id}-front.png`;
 }
 
-/** Какой ракурс показывать при выборе расположения */
-export const PLACEMENT_TO_ANGLE: Record<Placement, GarmentAngle> = {
-  chest_left: 'front',
-  chest_center: 'front',
-  chest_right: 'front',
-  back: 'back',
-  sleeve: 'sleeve',
-  other: 'front',
-};
-
-// ── Placements (Шаг 2) ─────────────────────────────────
-
-export const PLACEMENTS: { id: Placement; label: string }[] = [
-  { id: 'chest_left', label: 'Грудь слева' },
-  { id: 'chest_center', label: 'Грудь по центру' },
-  { id: 'chest_right', label: 'Грудь справа' },
-  { id: 'back', label: 'Спина' },
-  { id: 'sleeve', label: 'Рукав' },
-  { id: 'other', label: 'Другое' },
-];
-
-// ── Complexity (Шаг 3) ─────────────────────────────────
+// ── Complexity ──────────────────────────────────────────
 
 export const DESIGN_COMPLEXITY: {
   id: DesignComplexity;
@@ -145,19 +210,22 @@ export const DESIGN_COMPLEXITY: {
   {
     id: 'simple',
     label: 'Простая',
-    desc: 'Лого, надпись, имя. Без заливки. 1–2 цвета. До 10 см',
+    desc: 'До 10 см, до 2 цветов, без заливки',
     minPrice: 330,
   },
   {
     id: 'medium',
     label: 'Средняя',
-    desc: 'Лого или надпись с заливкой. 3–5 цветов. До 15 см',
+    desc: 'До 20 см, до 5 цветов, с заливкой',
     minPrice: 440,
   },
   {
     id: 'complex',
     label: 'Сложная',
-    desc: 'Большой рисунок, детализация, много цветов. До 30 см',
+    desc: 'До 30 см, без ограничений, с заливкой, 3D вышивка',
     minPrice: 630,
   },
 ];
+
+/** Наценка за "Другое" расположение */
+export const CUSTOM_PLACEMENT_SURCHARGE = 0.1; // +10%
