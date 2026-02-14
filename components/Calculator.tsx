@@ -58,7 +58,7 @@ const NeedleAnimation: React.FC = () => (
   </div>
 );
 
-/* Quantity stepper marks */
+/* Quantity slider marks */
 const QTY_MARKS = [1, 5, 10, 20, 30, 50];
 
 /* ━━━ MAIN ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -67,13 +67,14 @@ const Calculator: React.FC = () => {
   const [orders, setOrders] = useState<GarmentOrder[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [complexity, setComplexity] = useState<DesignComplexity | null>(null);
-  const [customQty, setCustomQty] = useState(false);
-  const [customQtyValue, setCustomQtyValue] = useState('');
+  const [comment, setComment] = useState('');
+  /** Which placement to show in preview (for multi-select) */
+  const [previewPlacement, setPreviewPlacement] = useState<string | null>(null);
 
   /* ── derived ── */
   const activeOrder = orders[activeIdx] ?? null;
   const hasOrders = orders.length > 0;
-  const allPlaced = hasOrders && orders.every((o) => o.placement !== null);
+  const allPlaced = hasOrders && orders.every((o) => o.placements.length > 0);
   const allReady = allPlaced && complexity !== null;
 
   const activeGarment = activeOrder
@@ -92,10 +93,11 @@ const Calculator: React.FC = () => {
         if (activeIdx >= next.length) setActiveIdx(Math.max(0, next.length - 1));
         return next;
       }
-      const next = [...prev, { garment: id, placement: null, quantity: 1 }];
+      const next = [...prev, { garment: id, placements: [], quantity: 1 }];
       setActiveIdx(next.length - 1);
       return next;
     });
+    setPreviewPlacement(null);
   };
 
   /* ── update order ── */
@@ -103,32 +105,70 @@ const Calculator: React.FC = () => {
     setOrders((prev) => prev.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
   };
 
+  /* ── toggle placement (multi-select) ── */
+  const togglePlacement = (plId: string) => {
+    if (!activeOrder) return;
+    const cur = activeOrder.placements;
+    let next: string[];
+    if (cur.includes(plId)) {
+      next = cur.filter((p) => p !== plId);
+    } else {
+      next = [...cur, plId];
+    }
+    updateOrder(activeIdx, { placements: next });
+    // Update preview to the just-clicked placement
+    if (next.includes(plId)) {
+      setPreviewPlacement(plId);
+    } else {
+      setPreviewPlacement(next[0] ?? null);
+    }
+  };
+
   /* ── pricing ── */
   const pricing = useMemo(() => {
     if (!allReady) return { lines: [] as any[], total: 0 };
 
-    const lines = orders.map((o) => {
+    const lines: {
+      garment: string;
+      placement: string;
+      qty: number;
+      perItem: number;
+      subtotal: number;
+      hasSurcharge: boolean;
+    }[] = [];
+
+    orders.forEach((o) => {
       const g = GARMENTS.find((g) => g.id === o.garment)!;
-      const pl = g.placements.find((p) => p.id === o.placement);
       const base = lookupPrice(complexity, Math.min(o.quantity, 50));
-      const surcharge = pl?.isCustom ? Math.round(base * CUSTOM_PLACEMENT_SURCHARGE) : 0;
-      const perItem = base + surcharge;
-      return {
-        garment: g.label,
-        placement: pl?.label ?? '',
-        qty: o.quantity,
-        perItem,
-        subtotal: perItem * o.quantity,
-        hasSurcharge: !!pl?.isCustom,
-      };
+
+      o.placements.forEach((plId) => {
+        const pl = g.placements.find((p) => p.id === plId);
+        const surcharge = pl?.isCustom
+          ? Math.round(base * CUSTOM_PLACEMENT_SURCHARGE)
+          : 0;
+        const perItem = base + surcharge;
+        lines.push({
+          garment: g.label,
+          placement: pl?.label ?? plId,
+          qty: o.quantity,
+          perItem,
+          subtotal: perItem * o.quantity,
+          hasSurcharge: !!pl?.isCustom,
+        });
+      });
     });
 
     return { lines, total: lines.reduce((s, l) => s + l.subtotal, 0) };
   }, [orders, complexity, allReady]);
 
   /* ── preview image ── */
+  const currentPreviewPl =
+    previewPlacement && activeOrder?.placements.includes(previewPlacement)
+      ? previewPlacement
+      : activeOrder?.placements[0] ?? null;
+
   const previewSrc = activeGarment
-    ? garmentImagePath(activeOrder!.garment, activeOrder!.placement)
+    ? garmentImagePath(activeOrder!.garment, currentPreviewPl)
     : null;
 
   return (
@@ -152,68 +192,100 @@ const Calculator: React.FC = () => {
         {/* ─── 3-column grid (desktop) ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_280px] gap-6 items-start">
 
-          {/* ══ COL 1: Garment tiles ══ */}
-          <div>
-            <h3 className="text-sm font-bold uppercase mb-3 flex items-center gap-2">
-              <StepBadge n={1} done={hasOrders} />
-              Изделие
-            </h3>
-            <div className="grid grid-cols-3 gap-2.5">
-              {GARMENTS.map((g) => {
-                const isSelected = orders.some((o) => o.garment === g.id);
-                return (
-                  <button
-                    key={g.id}
-                    onClick={() => toggleGarment(g.id)}
-                    className="relative aspect-square overflow-hidden rounded-lg group"
-                  >
-                    <img
-                      src={garmentImagePath(g.id)}
-                      alt={g.label}
-                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    />
-                    <div
-                      className={`absolute inset-0 transition-all duration-300 ${
-                        isSelected ? 'bg-loui-blue/25' : 'bg-black/5 group-hover:bg-black/35'
-                      }`}
-                    />
-                    {isSelected && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="absolute top-1 right-1 w-4 h-4 bg-loui-blue rounded-full flex items-center justify-center"
-                      >
-                        <Check size={10} className="text-white" />
-                      </motion.div>
-                    )}
-                    <div
-                      className={`absolute inset-x-0 bottom-0 px-1 py-1 text-center transition-opacity duration-300 ${
-                        isSelected ? 'opacity-100 bg-loui-blue/80' : 'opacity-0 group-hover:opacity-100 bg-black/60'
-                      }`}
+          {/* ══ COL 1: Garment tiles + Upload + Bonuses ══ */}
+          <div className="space-y-5">
+            {/* Garment grid */}
+            <div>
+              <h3 className="text-sm font-bold uppercase mb-3 flex items-center gap-2">
+                <StepBadge n={1} done={hasOrders} />
+                Изделие
+              </h3>
+              <div className="grid grid-cols-3 gap-2.5">
+                {GARMENTS.map((g) => {
+                  const isSelected = orders.some((o) => o.garment === g.id);
+                  return (
+                    <button
+                      key={g.id}
+                      onClick={() => toggleGarment(g.id)}
+                      className="relative aspect-square overflow-hidden rounded-lg group"
                     >
-                      <span className="text-white text-[10px] font-bold uppercase leading-none">
-                        {g.label}
-                      </span>
-                    </div>
-                    <div
-                      className={`absolute inset-0 rounded-lg border-2 pointer-events-none transition-colors ${
-                        isSelected ? 'border-loui-blue' : 'border-transparent'
-                      }`}
-                    />
-                  </button>
-                );
-              })}
+                      <img
+                        src={garmentImagePath(g.id)}
+                        alt={g.label}
+                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      />
+                      <div
+                        className={`absolute inset-0 transition-all duration-300 ${
+                          isSelected ? 'bg-loui-blue/25' : 'bg-black/5 group-hover:bg-black/35'
+                        }`}
+                      />
+                      {isSelected && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="absolute top-1 right-1 w-4 h-4 bg-loui-blue rounded-full flex items-center justify-center"
+                        >
+                          <Check size={10} className="text-white" />
+                        </motion.div>
+                      )}
+                      <div
+                        className={`absolute inset-x-0 bottom-0 px-1 py-1 text-center transition-opacity duration-300 ${
+                          isSelected ? 'opacity-100 bg-loui-blue/80' : 'opacity-0 group-hover:opacity-100 bg-black/60'
+                        }`}
+                      >
+                        <span className="text-white text-[10px] font-bold uppercase leading-none">
+                          {g.label}
+                        </span>
+                      </div>
+                      <div
+                        className={`absolute inset-0 rounded-lg border-2 pointer-events-none transition-colors ${
+                          isSelected ? 'border-loui-blue' : 'border-transparent'
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+              {hasOrders && (
+                <p className="text-[11px] text-gray-400 mt-2 text-center">
+                  Выбрано: {orders.length}
+                </p>
+              )}
             </div>
-            {hasOrders && (
-              <p className="text-[11px] text-gray-400 mt-2 text-center">
-                Выбрано: {orders.length}
+
+            {/* Upload CTA (always visible under garments) */}
+            <div className="rounded-xl border-2 border-dashed border-gray-300 bg-white/60 p-4 text-center">
+              <Upload className="mx-auto mb-2 text-gray-400" size={22} />
+              <p className="font-medium text-xs text-gray-700">Загрузите свой дизайн</p>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Мы оценим точную стоимость за&nbsp;10&nbsp;минут
               </p>
-            )}
+              <button className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border-2 border-loui-blue px-3 py-1.5 text-[11px] font-bold text-loui-blue hover:bg-loui-blue hover:text-white transition-colors">
+                <Upload size={12} />
+                Выбрать файл
+              </button>
+            </div>
+
+            {/* Bonuses */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
+                <Gift size={14} className="text-loui-blue shrink-0" />
+                <span className="text-[11px] font-medium text-gray-700">
+                  Дизайн программы в подарок
+                </span>
+              </div>
+              <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
+                <Palette size={14} className="text-loui-blue shrink-0" />
+                <span className="text-[11px] font-medium text-gray-700">
+                  Подберём цвет нити под ваш макет
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* ══ COL 2: Steps (placement → complexity → qty) ══ */}
+          {/* ══ COL 2: Placement → Quantity → Complexity → Comment ══ */}
           <div className="space-y-8 min-w-0">
-            {/* ── Per-garment tabs + placement ── */}
+            {/* ── Per-garment tabs + placement (multi-select) ── */}
             <AnimatePresence>
               {step >= 2 && (
                 <motion.div {...fadeUp}>
@@ -230,7 +302,10 @@ const Calculator: React.FC = () => {
                         return (
                           <button
                             key={o.garment}
-                            onClick={() => setActiveIdx(i)}
+                            onClick={() => {
+                              setActiveIdx(i);
+                              setPreviewPlacement(o.placements[0] ?? null);
+                            }}
                             className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                               i === activeIdx
                                 ? 'bg-loui-blue text-white'
@@ -238,39 +313,52 @@ const Calculator: React.FC = () => {
                             }`}
                           >
                             {g.label}
-                            {o.placement && <Check size={10} className="inline ml-1 -mt-0.5" />}
+                            {o.placements.length > 0 && (
+                              <Check size={10} className="inline ml-1 -mt-0.5" />
+                            )}
                           </button>
                         );
                       })}
                     </div>
                   )}
 
-                  {/* Placement options for active garment */}
+                  {/* Placement options for active garment (multi-select) */}
                   {activeGarment && (
-                    <div className="flex flex-wrap gap-2">
-                      {activeGarment.placements.map((pl) => (
-                        <button
-                          key={pl.id}
-                          onClick={() => updateOrder(activeIdx, { placement: pl.id })}
-                          className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all duration-200
-                            ${
-                              activeOrder?.placement === pl.id
-                                ? 'border-loui-blue bg-white text-loui-blue shadow-sm'
-                                : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white/60'
-                            }
-                            ${pl.isCustom ? 'italic' : ''}`}
-                        >
-                          {pl.label}
-                          {pl.isCustom && (
-                            <span className="text-[10px] ml-1 text-gray-400">(+10%)</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        {activeGarment.placements.map((pl) => {
+                          const isActive = activeOrder?.placements.includes(pl.id);
+                          return (
+                            <button
+                              key={pl.id}
+                              onClick={() => togglePlacement(pl.id)}
+                              className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all duration-200 flex items-center gap-1.5
+                                ${
+                                  isActive
+                                    ? 'border-loui-blue bg-white text-loui-blue shadow-sm'
+                                    : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white/60'
+                                }
+                                ${pl.isCustom ? 'italic' : ''}`}
+                            >
+                              {isActive && <Check size={12} className="text-loui-blue" />}
+                              {pl.label}
+                              {pl.isCustom && (
+                                <span className="text-[10px] ml-1 text-gray-400">(+10%)</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {activeOrder && activeOrder.placements.length > 1 && (
+                        <p className="text-[11px] text-gray-400 mt-2">
+                          Выбрано мест: {activeOrder.placements.length} — цена считается за каждое расположение
+                        </p>
+                      )}
+                    </>
                   )}
 
                   {/* Per-garment quantity */}
-                  {activeOrder?.placement && (
+                  {activeOrder && activeOrder.placements.length > 0 && (
                     <div className="mt-5">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-sm font-medium text-gray-600">Количество:</span>
@@ -385,9 +473,18 @@ const Calculator: React.FC = () => {
                             }}
                           />
                         </div>
-                        <div className="p-3 flex flex-col gap-1">
+                        <div className="p-3 flex flex-col gap-1.5">
                           <span className="font-bold text-sm">{cx.label}</span>
-                          <span className="text-xs text-gray-500 leading-snug">{cx.desc}</span>
+                          {/* Emoji attribute rows */}
+                          <div className="space-y-0.5">
+                            {cx.attrs.map((a, i) => (
+                              <div key={i} className="flex items-center gap-1.5 text-xs text-gray-500">
+                                <span>{a.emoji}</span>
+                                <span className="text-gray-400">{a.label}</span>
+                                <span className="ml-auto font-medium text-gray-700">{a.value}</span>
+                              </div>
+                            ))}
+                          </div>
                           <span
                             className={`text-xs font-bold mt-0.5 ${
                               complexity === cx.id ? 'text-loui-blue' : 'text-gray-400'
@@ -406,38 +503,21 @@ const Calculator: React.FC = () => {
               )}
             </AnimatePresence>
 
-            {/* ── Upload + bonuses ── */}
+            {/* ── Comment ── */}
             <AnimatePresence>
-              {step >= 4 && (
-                <motion.div {...fadeUp} className="space-y-4">
-                  {/* Upload */}
-                  <div className="rounded-xl border-2 border-dashed border-gray-300 bg-white/60 p-5 text-center">
-                    <Upload className="mx-auto mb-2 text-gray-400" size={24} />
-                    <p className="font-medium text-sm text-gray-700">Загрузите свой дизайн</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Мы оценим точную стоимость за&nbsp;10&nbsp;минут
-                    </p>
-                    <button className="mt-3 inline-flex items-center gap-2 rounded-lg border-2 border-loui-blue px-4 py-2 text-xs font-bold text-loui-blue hover:bg-loui-blue hover:text-white transition-colors">
-                      <Upload size={14} />
-                      Выбрать файл
-                    </button>
-                  </div>
-
-                  {/* Bonuses row */}
-                  <div className="flex flex-wrap gap-3">
-                    <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
-                      <Gift size={16} className="text-loui-blue" />
-                      <span className="text-xs font-medium text-gray-700">
-                        Дизайн программы в подарок
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
-                      <Palette size={16} className="text-loui-blue" />
-                      <span className="text-xs font-medium text-gray-700">
-                        Подберём цвет нити под ваш макет
-                      </span>
-                    </div>
-                  </div>
+              {step >= 3 && (
+                <motion.div {...fadeUp}>
+                  <h3 className="text-sm font-bold uppercase mb-3 flex items-center gap-2">
+                    <StepBadge n={4} done={comment.trim().length > 0} />
+                    Комментарий
+                  </h3>
+                  <textarea
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Опишите ваш дизайн, пожелания к вышивке или задайте вопрос. Например: «Логотип компании, нужен белый цвет нити на чёрном худи, тираж 30 шт»"
+                    rows={3}
+                    className="w-full rounded-xl border-2 border-gray-200 bg-white/60 px-4 py-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-loui-blue focus:outline-none resize-none transition-colors"
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -467,6 +547,27 @@ const Calculator: React.FC = () => {
                         transition={{ duration: 0.2 }}
                       />
                     </AnimatePresence>
+                    {/* Placement mini-tabs under preview */}
+                    {activeOrder && activeOrder.placements.length > 1 && (
+                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 bg-white/80 backdrop-blur-sm rounded-lg px-2 py-1">
+                        {activeOrder.placements.map((plId) => {
+                          const pl = activeGarment?.placements.find((p) => p.id === plId);
+                          return (
+                            <button
+                              key={plId}
+                              onClick={() => setPreviewPlacement(plId)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                                currentPreviewPl === plId
+                                  ? 'bg-loui-blue text-white'
+                                  : 'text-gray-500 hover:text-gray-800'
+                              }`}
+                            >
+                              {pl?.label ?? plId}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                   {orders.length > 1 && (
                     <div className="flex gap-1.5 px-2 py-2 border-t border-gray-100 overflow-x-auto">
@@ -475,7 +576,10 @@ const Calculator: React.FC = () => {
                         return (
                           <button
                             key={o.garment}
-                            onClick={() => setActiveIdx(i)}
+                            onClick={() => {
+                              setActiveIdx(i);
+                              setPreviewPlacement(o.placements[0] ?? null);
+                            }}
                             className={`shrink-0 w-9 h-9 rounded-lg overflow-hidden border-2 transition-colors ${
                               i === activeIdx ? 'border-loui-blue' : 'border-transparent opacity-50'
                             }`}

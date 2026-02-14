@@ -29,6 +29,6 @@ export type DesignComplexity = 'simple' | 'medium' | 'complex';
 /** Настройки одного изделия в заказе */
 export interface GarmentOrder {
   garment: GarmentType;
-  placement: string | null;
+  placements: string[];
   quantity: number;
 }

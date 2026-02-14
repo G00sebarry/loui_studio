@@ -201,28 +201,46 @@ export function garmentImagePath(
 
 // ── Complexity ──────────────────────────────────────────
 
+export interface ComplexityAttr {
+  emoji: string;
+  label: string;
+  value: string;
+}
+
 export const DESIGN_COMPLEXITY: {
   id: DesignComplexity;
   label: string;
-  desc: string;
+  attrs: ComplexityAttr[];
   minPrice: number;
 }[] = [
   {
     id: 'simple',
     label: 'Простая',
-    desc: 'До 10 см, до 2 цветов, без заливки',
+    attrs: [
+      { emoji: '📐', label: 'размер', value: 'до 10 см' },
+      { emoji: '🧵', label: 'цвет нити', value: 'до 2 шт' },
+      { emoji: '🪡', label: 'заливка', value: 'нет' },
+    ],
     minPrice: 330,
   },
   {
     id: 'medium',
     label: 'Средняя',
-    desc: 'До 20 см, до 5 цветов, с заливкой',
+    attrs: [
+      { emoji: '📐', label: 'размер', value: 'до 20 см' },
+      { emoji: '🧵', label: 'цвет нити', value: 'до 5 шт' },
+      { emoji: '🪡', label: 'заливка', value: 'есть' },
+    ],
     minPrice: 440,
   },
   {
     id: 'complex',
     label: 'Сложная',
-    desc: 'До 30 см, без ограничений, с заливкой, 3D вышивка',
+    attrs: [
+      { emoji: '📐', label: 'размер', value: 'до 30 см' },
+      { emoji: '🧵', label: 'цвет нити', value: 'без ограничений' },
+      { emoji: '🪡', label: 'заливка', value: '3D вышивка' },
+    ],
     minPrice: 630,
   },
 ];
