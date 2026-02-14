@@ -5,8 +5,6 @@ import {
   MessageCircle,
   Check,
   Info,
-  Plus,
-  Minus,
   Gift,
   Palette,
 } from 'lucide-react';
@@ -112,7 +110,7 @@ const Calculator: React.FC = () => {
     const lines = orders.map((o) => {
       const g = GARMENTS.find((g) => g.id === o.garment)!;
       const pl = g.placements.find((p) => p.id === o.placement);
-      const base = lookupPrice(complexity, o.quantity);
+      const base = lookupPrice(complexity, Math.min(o.quantity, 50));
       const surcharge = pl?.isCustom ? Math.round(base * CUSTOM_PLACEMENT_SURCHARGE) : 0;
       const perItem = base + surcharge;
       return {
@@ -152,7 +150,7 @@ const Calculator: React.FC = () => {
         </motion.div>
 
         {/* ─── 3-column grid (desktop) ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_300px] gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_280px] gap-6 items-start">
 
           {/* ══ COL 1: Garment tiles ══ */}
           <div>
@@ -160,7 +158,7 @@ const Calculator: React.FC = () => {
               <StepBadge n={1} done={hasOrders} />
               Изделие
             </h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2.5">
               {GARMENTS.map((g) => {
                 const isSelected = orders.some((o) => o.garment === g.id);
                 return (
@@ -273,39 +271,84 @@ const Calculator: React.FC = () => {
 
                   {/* Per-garment quantity */}
                   {activeOrder?.placement && (
-                    <div className="mt-4 flex items-center gap-3">
-                      <span className="text-sm text-gray-500">Кол-во:</span>
-                      <button
-                        onClick={() =>
-                          updateOrder(activeIdx, {
-                            quantity: Math.max(1, (activeOrder?.quantity ?? 1) - 1),
-                          })
+                    <div className="mt-5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm font-medium text-gray-600">Количество:</span>
+                        <span className="text-sm font-bold text-loui-blue">
+                          {activeOrder.quantity} шт.
+                        </span>
+                      </div>
+
+                      {/* Slider */}
+                      <div
+                        className={
+                          activeOrder.quantity > 50
+                            ? 'opacity-30 pointer-events-none'
+                            : ''
                         }
-                        className="w-8 h-8 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-100"
                       >
-                        <Minus size={14} />
-                      </button>
-                      <input
-                        type="number"
-                        min={1}
-                        value={activeOrder.quantity}
-                        onChange={(e) => {
-                          const v = Math.max(1, parseInt(e.target.value) || 1);
-                          updateOrder(activeIdx, { quantity: v });
-                        }}
-                        className="w-16 text-center border border-gray-300 rounded-lg py-1.5 text-sm font-bold"
-                      />
-                      <button
-                        onClick={() =>
-                          updateOrder(activeIdx, {
-                            quantity: (activeOrder?.quantity ?? 1) + 1,
-                          })
-                        }
-                        className="w-8 h-8 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-100"
-                      >
-                        <Plus size={14} />
-                      </button>
-                      <span className="text-xs text-gray-400">шт.</span>
+                        <input
+                          type="range"
+                          min={1}
+                          max={50}
+                          value={Math.min(activeOrder.quantity, 50)}
+                          onChange={(e) =>
+                            updateOrder(activeIdx, {
+                              quantity: parseInt(e.target.value),
+                            })
+                          }
+                          className="w-full h-2 cursor-pointer accent-[#0047FF]"
+                        />
+                        <div className="relative h-4 mt-0.5">
+                          {QTY_MARKS.map((m) => (
+                            <span
+                              key={m}
+                              className="absolute text-[10px] text-gray-400 -translate-x-1/2"
+                              style={{
+                                left: `${((m - 1) / 49) * 100}%`,
+                              }}
+                            >
+                              {m}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* >50 checkbox */}
+                      <label className="inline-flex items-center gap-2 mt-1 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={activeOrder.quantity > 50}
+                          onChange={() =>
+                            updateOrder(activeIdx, {
+                              quantity:
+                                activeOrder.quantity > 50 ? 50 : 51,
+                            })
+                          }
+                          className="w-4 h-4 rounded border-gray-300 accent-[#0047FF]"
+                        />
+                        <span className="text-sm text-gray-600">
+                          &gt;50 шт
+                        </span>
+                      </label>
+
+                      {/* Custom quantity input when >50 */}
+                      {activeOrder.quantity > 50 && (
+                        <input
+                          type="number"
+                          min={51}
+                          placeholder="Укажите количество"
+                          value={activeOrder.quantity}
+                          onChange={(e) => {
+                            const v = Math.max(
+                              51,
+                              parseInt(e.target.value) || 51,
+                            );
+                            updateOrder(activeIdx, { quantity: v });
+                          }}
+                          className="mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-[#0047FF] focus:outline-none"
+                        />
+                      )}
                     </div>
                   )}
                 </motion.div>
