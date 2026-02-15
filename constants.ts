@@ -227,7 +227,7 @@ export const DESIGN_COMPLEXITY: {
     id: 'medium',
     label: 'Средняя',
     attrs: [
-      { emoji: '', label: 'размер', value: 'до 20 см' },
+      { emoji: '', label: 'размер', value: 'до 15 см' },
       { emoji: '', label: 'цвет нити', value: 'до 5 шт' },
       { emoji: '', label: 'заливка', value: 'есть' },
     ],
@@ -238,8 +238,8 @@ export const DESIGN_COMPLEXITY: {
     label: 'Сложная',
     attrs: [
       { emoji: '', label: 'размер', value: 'до 30 см' },
-      { emoji: '', label: 'цвет нити', value: 'без ограничений' },
-      { emoji: '', label: 'заливка', value: '3D вышивка' },
+      { emoji: '', label: 'цвет нити', value: 'до 12 шт' },
+      { emoji: '', label: 'заливка, 3D', value: 'есть' },
     ],
     minPrice: 630,
   },
