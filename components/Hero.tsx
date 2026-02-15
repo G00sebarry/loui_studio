@@ -77,7 +77,7 @@ const Hero: React.FC = () => {
 
                 <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/55 via-transparent to-transparent p-4 text-center">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-white/90">
-                    Добавьте файл <strong>/public/reels/hero-reel.mp4</strong>
+              
                   </p>
                 </div>
 
